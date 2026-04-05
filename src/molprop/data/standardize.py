@@ -12,6 +12,7 @@ salt_remover = SaltRemover.SaltRemover()
 normalizer = rdMolStandardize.Normalizer()
 reionizer = rdMolStandardize.Reionizer()
 
+
 def standardize_smiles(smiles: str, keep_chirality: bool = True) -> Optional[str]:
     """
     Standardize a SMILES string using RDKit standard protocol.
@@ -23,11 +24,11 @@ def standardize_smiles(smiles: str, keep_chirality: bool = True) -> Optional[str
       4. Normalize functional groups
       5. Reionize
       6. Canonicalize SMILES (with optional stereochemistry)
-      
+
     Args:
         smiles (str): Input SMILES string
         keep_chirality (bool): If True, preserves stereochemical information in output
-        
+
     Returns:
         Optional[str]: Clean canonical SMILES, or None if parsing fails
     """

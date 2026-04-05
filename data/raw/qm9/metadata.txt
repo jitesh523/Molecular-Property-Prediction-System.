@@ -1,0 +1,5 @@
+Dataset   : qm9
+Task type : regression
+Source    : https://deepchemdata.s3-us-west-1.amazonaws.com/datasets/qm9.csv
+Targets   : mu, alpha, homo, lumo, gap, r2, zpve, u0, u298, h298, g298, cv
+Molecules : 133885

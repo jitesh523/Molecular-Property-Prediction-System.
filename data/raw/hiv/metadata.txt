@@ -1,0 +1,5 @@
+Dataset   : hiv
+Task type : classification
+Source    : https://deepchemdata.s3-us-west-1.amazonaws.com/datasets/HIV.csv
+Targets   : HIV_active
+Molecules : 41127

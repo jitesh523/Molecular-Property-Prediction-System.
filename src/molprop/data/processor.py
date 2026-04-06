@@ -88,9 +88,7 @@ class DatasetProcessor:
         return df[cols]
 
 
-def process_all_benchmark_datasets(
-    raw_dir: Path, processed_dir: Path, datasets: List[str] = None
-):
+def process_all_benchmark_datasets(raw_dir: Path, processed_dir: Path, datasets: List[str] = None):
     """Utility to batch process datasets."""
     processor = DatasetProcessor(raw_dir, processed_dir)
     if datasets is None:

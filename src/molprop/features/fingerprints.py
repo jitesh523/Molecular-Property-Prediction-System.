@@ -1,7 +1,8 @@
+from typing import List, Optional
+
 import numpy as np
 from rdkit import Chem
 from rdkit.Chem import AllChem
-from typing import List, Optional
 
 
 def smiles_to_morgan(
@@ -24,6 +25,7 @@ def smiles_to_morgan(
     # Using the documented way to convert BitVect to numpy
     # In newer RDKit, DataStructs.ConvertToNumpyArray(fp, arr) is common
     from rdkit import DataStructs
+
     arr = np.zeros((n_bits,), dtype=np.int8)
     DataStructs.ConvertToNumpyArray(fp, arr)
     return arr
@@ -39,7 +41,7 @@ def batch_smiles_to_morgan(
     for s in smiles_list:
         fp = smiles_to_morgan(s, radius, n_bits, use_chirality)
         if fp is None:
-            # For ML batches, we usually need consistent shapes. 
+            # For ML batches, we usually need consistent shapes.
             # If a SMILES is invalid here, it's a critical error because
             # it should have been caught in the preprocessing step.
             raise ValueError(f"Invalid SMILES encountered in featurization: {s}")

@@ -1,7 +1,7 @@
 import logging
 import random
 from collections import defaultdict
-from typing import Dict, List, Tuple
+from typing import List, Tuple
 
 import numpy as np
 from rdkit import Chem
@@ -30,7 +30,7 @@ def scaffold_split(
 ) -> Tuple[List[int], List[int], List[int]]:
     """
     Perform a scaffold split on a list of SMILES.
-    
+
     Splits are performed by grouping molecules by their Bemis-Murcko scaffold
     and assigning whole scaffold groups to each set.
     """

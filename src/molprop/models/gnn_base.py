@@ -1,7 +1,5 @@
-import torch
 import torch.nn as nn
-import torch.nn.functional as F
-from torch_geometric.nn import global_mean_pool, global_max_pool
+from torch_geometric.nn import global_max_pool, global_mean_pool
 
 
 class GNNBase(nn.Module):
@@ -41,6 +39,7 @@ class GNNBase(nn.Module):
             return global_max_pool(x, batch)
         elif self.readout == "sum":
             from torch_geometric.nn import global_add_pool
+
             return global_add_pool(x, batch)
         else:
             raise ValueError(f"Unknown readout method: {self.readout}")

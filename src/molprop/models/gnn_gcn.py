@@ -1,6 +1,7 @@
 import torch
 import torch.nn.functional as F
 from torch_geometric.nn import GCNConv
+
 from molprop.models.gnn_base import GNNBase
 
 
@@ -22,7 +23,7 @@ class GCNModel(GNNBase):
         x, edge_index, batch = data.x, data.edge_index, data.batch
 
         # Message Passing
-        for i, conv in enumerate(self.convs):
+        for conv in self.convs:
             x = conv(x, edge_index)
             x = F.relu(x)
             x = F.dropout(x, p=self.dropout, training=self.training)

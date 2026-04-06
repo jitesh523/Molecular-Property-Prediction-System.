@@ -1,6 +1,5 @@
 import argparse
 import logging
-import os
 from pathlib import Path
 
 import pandas as pd
@@ -28,16 +27,16 @@ def train_one_epoch(model, loader, optimizer, device, task_type):
         data = data.to(device)
         optimizer.zero_grad()
         out = model(data)
-        
+
         # Pull labels
         y = data.y.view(-1, 1)
-        
+
         if task_type == "regression":
             loss = F.mse_loss(out, y)
         else:
             # Classification
             loss = F.binary_cross_entropy_with_logits(out, y)
-            
+
         loss.backward()
         optimizer.step()
         total_loss += loss.item() * data.num_graphs
@@ -49,26 +48,26 @@ def evaluate(model, loader, device, task_type):
     model.eval()
     y_true_list = []
     y_pred_list = []
-    
+
     for data in loader:
         data = data.to(device)
         out = model(data)
-        
+
         y_true_list.append(data.y.view(-1, 1).cpu())
         if task_type == "classification":
             y_pred_list.append(torch.sigmoid(out).cpu())
         else:
             y_pred_list.append(out.cpu())
-            
+
     y_true = torch.cat(y_true_list, dim=0).numpy()
     y_pred = torch.cat(y_pred_list, dim=0).numpy()
-    
+
     import numpy as np
     from sklearn.metrics import mean_squared_error, roc_auc_score
-    
+
     if task_type == "regression":
         mse = mean_squared_error(y_true, y_pred)
-        return np.sqrt(mse) # RMSE
+        return np.sqrt(mse)  # RMSE
     else:
         try:
             return roc_auc_score(y_true, y_pred)
@@ -80,14 +79,18 @@ def evaluate(model, loader, device, task_type):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--dataset", type=str, default="delaney", help="Dataset name")
-    parser.add_argument("--task", type=str, default="regression", choices=["regression", "classification"])
+    parser.add_argument(
+        "--task", type=str, default="regression", choices=["regression", "classification"]
+    )
     parser.add_argument("--model", type=str, default="gcn", choices=["gcn", "gat", "mpnn"])
     parser.add_argument("--epochs", type=int, default=100)
     parser.add_argument("--batch_size", type=int, default=32)
     parser.add_argument("--lr", type=float, default=0.001)
     parser.add_argument("--hidden", type=int, default=128)
     parser.add_argument("--layers", type=int, default=3)
-    parser.add_argument("--device", type=str, default="auto", choices=["auto", "cpu", "cuda", "mps"])
+    parser.add_argument(
+        "--device", type=str, default="auto", choices=["auto", "cpu", "cuda", "mps"]
+    )
     args = parser.parse_args()
 
     # Device Setup
@@ -106,7 +109,7 @@ def main():
     ROOT = Path(__file__).resolve().parent.parent
     data_path = ROOT / "data" / "processed" / args.dataset / "processed.csv"
     df = pd.read_csv(data_path)
-    
+
     # Identify target column (assuming first non-smiles column)
     target_col = [c for c in df.columns if c != "std_smiles"][0]
     log.info(f"Training on {args.dataset} task: {target_col}")
@@ -122,11 +125,11 @@ def main():
     # Split
     smiles_list = [g.smiles for g in dataset]
     train_idx, val_idx, test_idx = random_scaffold_split(smiles_list)
-    
+
     train_data = [dataset[i] for i in train_idx]
     val_data = [dataset[i] for i in val_idx]
     test_data = [dataset[i] for i in test_idx]
-    
+
     train_loader = DataLoader(train_data, batch_size=args.batch_size, shuffle=True)
     val_loader = DataLoader(val_data, batch_size=args.batch_size)
     test_loader = DataLoader(test_data, batch_size=args.batch_size)
@@ -139,7 +142,7 @@ def main():
         model = GATModel(in_dim=in_dim, hidden_dim=args.hidden, out_dim=1, num_layers=args.layers)
     else:
         model = MPNNModel(in_dim=in_dim, hidden_dim=args.hidden, out_dim=1, num_layers=args.layers)
-    
+
     model = model.to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
 
@@ -152,7 +155,7 @@ def main():
     for epoch in range(1, args.epochs + 1):
         loss = train_one_epoch(model, train_loader, optimizer, device, args.task)
         val_score = evaluate(model, val_loader, device, args.task)
-        
+
         if epoch % 10 == 0 or epoch == 1:
             log.info(f"Epoch {epoch:03d} | Loss: {loss:.4f} | Val Score: {val_score:.4f}")
 

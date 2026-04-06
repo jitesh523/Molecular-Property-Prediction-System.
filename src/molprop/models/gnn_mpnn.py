@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch_geometric.nn import MessagePassing
+
 from molprop.models.gnn_base import GNNBase
 
 
@@ -51,7 +52,7 @@ class MPNNModel(GNNBase):
 
         # First layer
         self.layers.append(MPNNLayer(self.in_dim, self.hidden_dim, self.edge_dim))
-        
+
         # Intermediate layers
         for _ in range(self.num_layers - 1):
             self.layers.append(MPNNLayer(self.hidden_dim, self.hidden_dim, self.edge_dim))

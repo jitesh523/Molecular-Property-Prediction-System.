@@ -1,7 +1,8 @@
+from typing import List, Optional
+
+import numpy as np
 from rdkit import Chem
 from rdkit.Chem import Descriptors
-import numpy as np
-from typing import List, Optional
 
 
 def smiles_to_descriptors(smiles: str) -> Optional[np.ndarray]:
@@ -22,9 +23,9 @@ def smiles_to_descriptors(smiles: str) -> Optional[np.ndarray]:
         Descriptors.NumRotatableBonds(mol),
         Descriptors.MaxAbsPartialCharge(mol),
         Descriptors.MinAbsPartialCharge(mol),
-        Descriptors.HeavyAtomCount(mol)
+        Descriptors.HeavyAtomCount(mol),
     ]
-    
+
     return np.array(desc_vals, dtype=np.float32)
 
 
@@ -46,6 +47,13 @@ def get_descriptor_names() -> List[str]:
     The names of the descriptors returned by smiles_to_descriptors.
     """
     return [
-        "MolLogP", "MolWt", "TPSA", "NumHDonors", "NumHAcceptors",
-        "NumRotatableBonds", "MaxAbsPartialCharge", "MinAbsPartialCharge", "HeavyAtomCount"
+        "MolLogP",
+        "MolWt",
+        "TPSA",
+        "NumHDonors",
+        "NumHAcceptors",
+        "NumRotatableBonds",
+        "MaxAbsPartialCharge",
+        "MinAbsPartialCharge",
+        "HeavyAtomCount",
     ]

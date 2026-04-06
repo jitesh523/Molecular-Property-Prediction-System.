@@ -1,5 +1,5 @@
 import logging
-from typing import Dict, Literal, Union
+from typing import Dict, Literal
 
 import numpy as np
 from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
@@ -74,7 +74,7 @@ class BaselineModel:
             # Classification
             y_pred = self.predict(x)
             y_proba = self.predict_proba(x)
-            
+
             # Handle binary/multi-label classification
             if len(y_proba.shape) == 2 and y_proba.shape[1] == 2:
                 # Binary classification

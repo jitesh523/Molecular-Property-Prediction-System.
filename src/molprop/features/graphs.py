@@ -1,8 +1,8 @@
+from typing import List, Optional
+
 import torch
 from rdkit import Chem
 from torch_geometric.data import Data
-import numpy as np
-from typing import List, Optional
 
 
 def atom_to_features(atom: Chem.Atom) -> List[float]:

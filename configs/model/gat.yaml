@@ -1,0 +1,6 @@
+name: "gat"
+type: "gat"
+hidden_dim: 128
+num_layers: 3
+dropout: 0.2
+heads: 4

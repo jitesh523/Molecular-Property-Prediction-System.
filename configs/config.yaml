@@ -1,0 +1,21 @@
+defaults:
+  - _self_
+  - model: gcn
+  - dataset: delaney
+
+training:
+  epochs: 100
+  batch_size: 64
+  lr: 0.001
+  hidden_dim: 128
+  num_layers: 3
+  dropout: 0.2
+  patience: 20
+
+mlflow:
+  experiment_name: "Molecular_Property_Prediction"
+  tracking_uri: "mlruns"
+  run_name: "${model.name}_${dataset.name}"
+
+# Hardware settings
+device: "auto" # auto, cpu, cuda, mps

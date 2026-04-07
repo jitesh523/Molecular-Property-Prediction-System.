@@ -1,0 +1,4 @@
+name: "bbbp"
+task_type: "classification"
+target: "p_np"
+split_type: "random_scaffold"

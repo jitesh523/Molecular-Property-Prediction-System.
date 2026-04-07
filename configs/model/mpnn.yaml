@@ -1,0 +1,6 @@
+name: "mpnn"
+type: "mpnn"
+hidden_dim: 128
+num_layers: 3
+dropout: 0.2
+edge_dim: 3

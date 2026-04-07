@@ -1,0 +1,4 @@
+name: "delaney"
+task_type: "regression"
+target: "measured log solubility in mols per litre"
+split_type: "random_scaffold"

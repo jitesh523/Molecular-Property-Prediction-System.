@@ -1,0 +1,5 @@
+Dataset   : sider
+Task type : classification
+Source    : https://deepchemdata.s3-us-west-1.amazonaws.com/datasets/sider.csv.gz
+Targets   : Hepatobiliary disorders, Product issues, Eye disorders, Investigations, Gastrointestinal disorders, Social circumstances, Immune system disorders, Endocrine disorders, Vascular disorders, Psychiatric disorders, Cardiac disorders, Nervous system disorders
+Molecules : 1427

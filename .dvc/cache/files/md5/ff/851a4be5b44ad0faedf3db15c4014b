@@ -1,0 +1,5 @@
+Dataset   : qm8
+Task type : regression
+Source    : https://deepchemdata.s3-us-west-1.amazonaws.com/datasets/qm8.csv
+Targets   : E1-CC2, E2-CC2, f1-CC2, f2-CC2, E1-PBE0, E2-PBE0, f1-PBE0, f2-PBE0, E1-CAM, E2-CAM, f1-CAM, f2-CAM
+Molecules : 21786

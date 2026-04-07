@@ -1,0 +1,5 @@
+Dataset   : lipo
+Task type : regression
+Source    : https://deepchemdata.s3-us-west-1.amazonaws.com/datasets/Lipophilicity.csv
+Targets   : exp
+Molecules : 4200

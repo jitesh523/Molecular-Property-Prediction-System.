@@ -1,0 +1,5 @@
+Dataset   : delaney
+Task type : regression
+Source    : https://deepchemdata.s3-us-west-1.amazonaws.com/datasets/delaney-processed.csv
+Targets   : measured log solubility in mols per litre
+Molecules : 1128

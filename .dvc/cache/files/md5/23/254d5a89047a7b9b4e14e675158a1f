@@ -1,0 +1,5 @@
+Dataset   : qm7
+Task type : regression
+Source    : https://deepchemdata.s3-us-west-1.amazonaws.com/datasets/qm7.csv
+Targets   : u0_atom
+Molecules : 6834

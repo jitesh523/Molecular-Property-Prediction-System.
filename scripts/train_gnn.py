@@ -2,13 +2,12 @@ import logging
 import sys
 from pathlib import Path
 
-import hydra
 import mlflow
 import pandas as pd
 import torch
 import torch.nn.functional as F
 from hydra import compose, initialize
-from omegaconf import DictConfig, OmegaConf
+from omegaconf import DictConfig
 from rich.console import Console
 from torch_geometric.loader import DataLoader
 from tqdm import tqdm

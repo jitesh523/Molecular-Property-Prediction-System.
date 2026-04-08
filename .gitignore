@@ -58,3 +58,4 @@ cover/
 # Project specific
 pdf_content.txt
 *.pt
+mlruns/

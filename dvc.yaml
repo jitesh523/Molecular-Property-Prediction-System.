@@ -1,0 +1,15 @@
+stages:
+  download_data:
+    cmd: python scripts/download_molnet_datasets.py
+    deps:
+      - scripts/download_molnet_datasets.py
+    outs:
+      - data/raw/
+
+  process_data:
+    cmd: python -c "from molprop.data.processor import process_all; process_all()"
+    deps:
+      - data/raw/
+      - src/molprop/data/processor.py
+    outs:
+      - data/processed/

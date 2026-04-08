@@ -170,10 +170,10 @@ def run_training(cfg: DictConfig):
 
     run_name = cfg.mlflow.run_name
     with mlflow.start_run(run_name=run_name):
-        # Log Hyperparameters
-        mlflow.log_params(OmegaConf.to_container(cfg.training))
-        mlflow.log_params(OmegaConf.to_container(cfg.model))
-        mlflow.log_params(OmegaConf.to_container(cfg.dataset))
+        # Log Hyperparameters with prefixes to avoid collisions (e.g., 'name')
+        mlflow.log_params({f"train.{k}": v for k, v in cfg.training.items()})
+        mlflow.log_params({f"model.{k}": v for k, v in cfg.model.items()})
+        mlflow.log_params({f"dataset.{k}": v for k, v in cfg.dataset.items()})
 
         # Training Loop
         best_val = float("inf") if cfg.dataset.task_type == "regression" else 0

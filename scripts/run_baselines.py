@@ -9,6 +9,10 @@ from rich.table import Table
 from molprop.data.splits import random_scaffold_split, scaffold_split
 from molprop.features.fingerprints import batch_smiles_to_morgan
 from molprop.models.baselines import BaselineModel
+from molprop.models.explain_baselines import (
+    get_shap_explanation,
+    save_shap_report,
+)
 
 logging.basicConfig(level=logging.INFO, format="%(message)s")
 log = logging.getLogger(__name__)
@@ -16,7 +20,11 @@ console = Console()
 
 
 def run_benchmark(
-    dataset_name: str, task_type: str, processed_dir: Path, split_type: str = "random_scaffold"
+    dataset_name: str,
+    task_type: str,
+    processed_dir: Path,
+    split_type: str = "random_scaffold",
+    explain: bool = False,
 ):
     """
     Run baseline models on a specific dataset.
@@ -92,6 +100,20 @@ def run_benchmark(
         results.append({"Model": name, "Split": "Validation", **val_metrics})
         results.append({"Model": name, "Split": "Test", **test_metrics})
 
+        # SHAP Explanation
+        if explain:
+            log.info(f"Generating SHAP explanation for {name}...")
+            ROOT = Path(__file__).resolve().parent.parent
+            explanation_dir = ROOT / "results" / "explanations"
+            shap_values = get_shap_explanation(model.model, x_test)
+            save_shap_report(
+                shap_values,
+                smiles_list_valid,
+                explanation_dir,
+                dataset_name,
+                name.lower(),
+            )
+
     # 4. Display Results
     table = Table(title=f"Baseline Results: {dataset_name}")
     table.add_column("Model", style="cyan")
@@ -130,9 +152,18 @@ if __name__ == "__main__":
     parser.add_argument(
         "--split-type", type=str, default="random_scaffold", choices=["scaffold", "random_scaffold"]
     )
+    parser.add_argument(
+        "--explain", action="store_true", help="Run SHAP explanation after evaluation"
+    )
     args = parser.parse_args()
 
     ROOT = Path(__file__).resolve().parent.parent
     processed_path = ROOT / "data" / "processed"
 
-    run_benchmark(args.dataset, args.task, processed_path, split_type=args.split_type)
+    run_benchmark(
+        args.dataset,
+        args.task,
+        processed_path,
+        split_type=args.split_type,
+        explain=args.explain,
+    )

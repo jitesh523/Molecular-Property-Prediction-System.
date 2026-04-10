@@ -28,6 +28,13 @@ from molprop.data.splits import random_scaffold_split
 from molprop.features.fingerprints import batch_smiles_to_morgan
 from molprop.features.graphs import smiles_to_graph
 from molprop.models.baselines import BaselineModel
+from molprop.models.evaluate import (
+    plot_calibration_curve,
+    plot_error_distribution,
+    plot_pr_curve,
+    plot_regression_scatter,
+    plot_roc_curve,
+)
 
 logging.basicConfig(level=logging.INFO, format="%(message)s")
 log = logging.getLogger(__name__)
@@ -66,7 +73,9 @@ def evaluate_classification(y_true, y_score, y_pred) -> Dict[str, float]:
     }
 
 
-def run_baseline_benchmark(dataset_name: str, task_type: str, processed_dir: Path) -> List[Dict]:
+def run_baseline_benchmark(
+    dataset_name: str, task_type: str, processed_dir: Path, generate_plots: bool = False
+) -> List[Dict]:
     """Run RF and XGBoost baselines on a dataset."""
     data_path = processed_dir / dataset_name / "processed.csv"
     if not data_path.exists():
@@ -101,11 +110,22 @@ def run_baseline_benchmark(dataset_name: str, task_type: str, processed_dir: Pat
         if task_type == "regression":
             y_pred = model.predict(x_test)
             metrics = evaluate_regression(y_test, y_pred)
+            if generate_plots:
+                ROOT = Path(__file__).resolve().parent.parent
+                plots_dir = ROOT / "results" / "plots"
+                plot_regression_scatter(y_test, y_pred, name, dataset_name, plots_dir)
+                plot_error_distribution(y_test, y_pred, name, dataset_name, plots_dir)
         else:
             y_pred = model.predict(x_test)
             y_proba = model.predict_proba(x_test)
             y_score = y_proba[:, 1] if y_proba.ndim == 2 else y_proba
             metrics = evaluate_classification(y_test, y_score, y_pred)
+            if generate_plots:
+                ROOT = Path(__file__).resolve().parent.parent
+                plots_dir = ROOT / "results" / "plots"
+                plot_roc_curve(y_test, y_score, name, dataset_name, plots_dir)
+                plot_pr_curve(y_test, y_score, name, dataset_name, plots_dir)
+                plot_calibration_curve(y_test, y_score, name, dataset_name, plots_dir)
 
         results.append({"Dataset": dataset_name, "Model": name, "Split": "Scaffold", **metrics})
 
@@ -274,6 +294,11 @@ def main():
         action="store_true",
         help="Skip GNN benchmarks (useful if no trained weights exist)",
     )
+    parser.add_argument(
+        "--plots",
+        action="store_true",
+        help="Generate evaluation plots (PR, ROC, scatter, etc.)",
+    )
     args = parser.parse_args()
 
     ROOT = Path(__file__).resolve().parent.parent
@@ -295,7 +320,9 @@ def main():
         log.info(f"{'=' * 60}")
 
         # Baselines
-        baseline_results = run_baseline_benchmark(ds_name, task_type, processed_dir)
+        baseline_results = run_baseline_benchmark(
+            ds_name, task_type, processed_dir, generate_plots=args.plots
+        )
         all_results.extend(baseline_results)
 
         # GNNs

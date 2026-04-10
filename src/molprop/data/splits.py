@@ -98,3 +98,47 @@ def random_scaffold_split(
             test_inds.extend(scaffold_set)
 
     return train_inds, val_inds, test_inds
+
+
+def scaffold_kfold(
+    smiles_list: List[str],
+    n_folds: int = 5,
+    seed: int = 42,
+) -> List[Tuple[List[int], List[int]]]:
+    """
+    K-fold scaffold cross-validation.
+
+    Groups molecules by Bemis-Murcko scaffold, shuffles scaffold groups,
+    then distributes them across k folds. Returns a list of
+    (train_indices, val_indices) tuples.
+
+    This gives more robust performance estimates on small datasets
+    like FreeSolv/ESOL compared to a single scaffold split.
+    """
+    random.seed(seed)
+
+    # Group by scaffold
+    scaffolds = defaultdict(list)
+    for idx, smiles in enumerate(smiles_list):
+        scaffold = generate_scaffold(smiles)
+        scaffolds[scaffold].append(idx)
+
+    scaffold_sets = list(scaffolds.values())
+    random.shuffle(scaffold_sets)
+
+    # Distribute scaffold groups round-robin into k folds
+    folds: List[List[int]] = [[] for _ in range(n_folds)]
+    for i, scaffold_set in enumerate(scaffold_sets):
+        folds[i % n_folds].extend(scaffold_set)
+
+    # Generate (train, val) for each fold
+    splits = []
+    for fold_idx in range(n_folds):
+        val_inds = folds[fold_idx]
+        train_inds = []
+        for j in range(n_folds):
+            if j != fold_idx:
+                train_inds.extend(folds[j])
+        splits.append((train_inds, val_inds))
+
+    return splits

@@ -6,7 +6,7 @@ import pandas as pd
 from rich.console import Console
 from rich.table import Table
 
-from molprop.data.splits import random_scaffold_split, scaffold_split
+from molprop.data.splits import random_scaffold_split, scaffold_kfold, scaffold_split
 from molprop.features.fingerprints import batch_smiles_to_morgan
 from molprop.models.baselines import BaselineModel
 from molprop.models.explain_baselines import (
@@ -143,6 +143,69 @@ def run_benchmark(
     console.print(table)
 
 
+def run_kfold_benchmark(
+    dataset_name: str,
+    task_type: str,
+    processed_dir: Path,
+    n_folds: int = 5,
+):
+    """
+    Run k-fold scaffold cross-validation for baseline models.
+    Reports mean ± std metrics across folds.
+    """
+    import numpy as np
+
+    data_path = processed_dir / dataset_name / "processed.csv"
+    if not data_path.exists():
+        log.error(f"Processed data not found for {dataset_name} at {data_path}")
+        return
+
+    log.info(f"\n[bold blue]{n_folds}-Fold Scaffold CV: {dataset_name}[/bold blue]")
+    df = pd.read_csv(data_path)
+
+    smiles_list = df["std_smiles"].tolist()
+    target_cols = [c for c in df.columns if c != "std_smiles"]
+    if not target_cols:
+        log.error(f"No target columns found in {dataset_name}")
+        return
+    target = target_cols[0]
+
+    x = batch_smiles_to_morgan(smiles_list)
+    y = df[target].values
+
+    valid_mask = ~pd.isna(y)
+    x = x[valid_mask]
+    y = y[valid_mask]
+    smiles_valid = [smiles_list[i] for i in range(len(smiles_list)) if valid_mask[i]]
+
+    folds = scaffold_kfold(smiles_valid, n_folds=n_folds)
+
+    models_config = [
+        ("RF", "rf", {"n_estimators": 100, "random_state": 42}),
+        ("XGBoost", "xgb", {"n_estimators": 100, "random_state": 42}),
+    ]
+
+    for name, mtype, params in models_config:
+        fold_metrics = []
+        for fold_i, (train_idx, val_idx) in enumerate(folds):
+            model = BaselineModel(model_type=mtype, task_type=task_type, params=params)
+            model.train(x[train_idx], y[train_idx])
+            metrics = model.evaluate(x[val_idx], y[val_idx])
+            fold_metrics.append(metrics)
+            log.info(f"  Fold {fold_i + 1}: {metrics}")
+
+        # Aggregate
+        all_keys = fold_metrics[0].keys()
+        summary = {}
+        for key in all_keys:
+            vals = [m[key] for m in fold_metrics]
+            summary[key] = f"{np.mean(vals):.4f} ± {np.std(vals):.4f}"
+
+        log.info(f"\n[bold green]{name} — {n_folds}-Fold Mean ± Std:[/bold green]")
+        for key, val in summary.items():
+            log.info(f"  {key}: {val}")
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--dataset", type=str, default="delaney", help="Dataset name")
@@ -155,15 +218,26 @@ if __name__ == "__main__":
     parser.add_argument(
         "--explain", action="store_true", help="Run SHAP explanation after evaluation"
     )
+    parser.add_argument(
+        "--kfold", type=int, default=0, help="Run k-fold scaffold CV (e.g., --kfold 5)"
+    )
     args = parser.parse_args()
 
     ROOT = Path(__file__).resolve().parent.parent
     processed_path = ROOT / "data" / "processed"
 
-    run_benchmark(
-        args.dataset,
-        args.task,
-        processed_path,
-        split_type=args.split_type,
-        explain=args.explain,
-    )
+    if args.kfold > 1:
+        run_kfold_benchmark(
+            args.dataset,
+            args.task,
+            processed_path,
+            n_folds=args.kfold,
+        )
+    else:
+        run_benchmark(
+            args.dataset,
+            args.task,
+            processed_path,
+            split_type=args.split_type,
+            explain=args.explain,
+        )

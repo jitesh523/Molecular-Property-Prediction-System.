@@ -1,0 +1,18 @@
+name: "multitask"
+type: "multitask"
+backbone: "gcn"
+hidden_dim: 128
+num_layers: 3
+dropout: 0.2
+
+# For GAT backbone:
+# backbone: "gat"
+# heads: 4
+
+# For MPNN backbone:
+# backbone: "mpnn"
+# edge_dim: 3
+
+# Task types are auto-inferred from data if not set.
+# Override with a list matching your target columns:
+# task_types: ["classification", "regression"]

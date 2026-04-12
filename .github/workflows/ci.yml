@@ -22,15 +22,23 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install torch torch-geometric rdkit numpy pandas
+          pip install scikit-learn xgboost shap joblib
           pip install fastapi uvicorn httpx pydantic
           pip install -e .
-          pip install pytest ruff
+          pip install pytest pytest-cov ruff
 
       - name: Lint with Ruff
         run: |
           ruff check .
           ruff format --check .
 
-      - name: Test with pytest
+      - name: Test with pytest + coverage
         run: |
-          pytest tests/
+          pytest tests/ --cov=molprop --cov-report=term-missing --cov-report=xml -q
+
+      - name: Upload coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage.xml

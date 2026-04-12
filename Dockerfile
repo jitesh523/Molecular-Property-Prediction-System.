@@ -1,4 +1,8 @@
-FROM python:3.11-slim as builder
+FROM python:3.11-slim AS builder
+
+LABEL maintainer="Molecular Property Prediction System"
+LABEL version="1.0.0"
+LABEL description="Production inference API for molecular property prediction"
 
 WORKDIR /app
 COPY pyproject.toml .
@@ -11,11 +15,12 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# Install system utilities needed by RDKit or PyTorch if any
+# Install system utilities needed by RDKit
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     libxrender1 \
     libxtst6 \
+    curl \
     && rm -rf /var/lib/apt/lists/*
 
 # Install specific Python requirements needed for ML inference
@@ -31,7 +36,9 @@ RUN pip install --no-cache-dir \
     rdkit==2025.09.6 \
     pandas==2.2.2 \
     scikit-learn==1.8.0 \
-    numpy==1.26.4
+    numpy==1.26.4 \
+    joblib>=1.3.0 \
+    shap>=0.46.0
 
 # Copy built package and install it
 COPY --from=builder /app/dist/*.whl ./
@@ -44,7 +51,13 @@ COPY src ./src
 ENV PYTHONPATH=/app/src
 ENV MODEL_TYPE=gcn
 ENV MODEL_WEIGHTS=best_model_gcn_bbbp.pt
+ENV MODEL_DATASET=bbbp
+ENV MODEL_TASK=classification
 
 EXPOSE 8000
+
+# Health check for container orchestration
+HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
+    CMD curl -f http://localhost:8000/health || exit 1
 
 CMD ["uvicorn", "molprop.serving.api:app", "--host", "0.0.0.0", "--port", "8000"]

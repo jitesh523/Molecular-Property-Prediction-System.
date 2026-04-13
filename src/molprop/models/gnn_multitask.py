@@ -88,16 +88,31 @@ class MultiTaskGNN(nn.Module):
                 )
             )
 
-    def forward(self, data):
+    def forward(self, data, mc_dropout: bool = False):
         """
         Returns:
             Tensor of shape (batch_size, num_tasks) with raw logits/values.
         """
         # Get graph-level embeddings from backbone
-        emb = self.backbone(data)  # (batch_size, hidden_dim)
+        # backbone is a GNNModel whose MLP was replaced by Identity
+        # We need to manually apply dropout if mc_dropout is True because
+        # backbone.mlp was Identity, but we can call it directly.
+        emb = self.backbone(data, mc_dropout=mc_dropout)  # (batch_size, hidden_dim)
 
         # Apply each task head
-        outputs = [head(emb) for head in self.task_heads]
+        # task_heads is a list of Sequential: [Linear, ReLU, Dropout, Linear]
+        # Sequential doesn't support passing args to intermediate layers,
+        # so we manually implement the head logic to respect mc_dropout.
+        is_training = self.training or mc_dropout
+        outputs = []
+        for head in self.task_heads:
+            # head is Sequential(Linear, ReLU, Dropout, Linear)
+            h = head[0](emb)
+            h = head[1](h)
+            h = F.dropout(h, p=self.backbone.dropout, training=is_training)
+            h = head[3](h)
+            outputs.append(h)
+
         return torch.cat(outputs, dim=-1)  # (batch_size, num_tasks)
 
 

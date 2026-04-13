@@ -31,15 +31,16 @@ class GATModel(GNNBase):
             GATConv(self.hidden_dim * self.heads, self.hidden_dim, heads=1, concat=False)
         )
 
-    def forward(self, data):
+    def forward(self, data, mc_dropout: bool = False):
         x, edge_index, batch = data.x, data.edge_index, data.batch
+        is_training = self.training or mc_dropout
 
         # Message Passing with Attention
         for i, conv in enumerate(self.convs):
             x = conv(x, edge_index)
             if i < len(self.convs) - 1:
                 x = F.elu(x)
-                x = F.dropout(x, p=self.dropout, training=self.training)
+                x = F.dropout(x, p=self.dropout, training=is_training)
 
         # Global Readout
         x = self.pooling(x, batch)

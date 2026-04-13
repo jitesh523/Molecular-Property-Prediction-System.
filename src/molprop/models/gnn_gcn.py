@@ -19,14 +19,15 @@ class GCNModel(GNNBase):
         for _ in range(self.num_layers - 1):
             self.convs.append(GCNConv(self.hidden_dim, self.hidden_dim))
 
-    def forward(self, data):
+    def forward(self, data, mc_dropout: bool = False):
         x, edge_index, batch = data.x, data.edge_index, data.batch
+        is_training = self.training or mc_dropout
 
         # Message Passing
         for conv in self.convs:
             x = conv(x, edge_index)
             x = F.relu(x)
-            x = F.dropout(x, p=self.dropout, training=self.training)
+            x = F.dropout(x, p=self.dropout, training=is_training)
 
         # Global Readout
         x = self.pooling(x, batch)

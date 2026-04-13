@@ -98,6 +98,9 @@ MAX_SMILES_LEN = 500
 class PredictRequest(BaseModel):
     smiles: str = Field(..., max_length=MAX_SMILES_LEN, description="SMILES string")
     explain: bool = Field(False, description="Include atom-level importance explanation")
+    uncertainty_samples: int = Field(
+        0, ge=0, le=50, description="Number of MC Dropout samples for uncertainty estimation"
+    )
 
 
 class BatchPredictRequest(BaseModel):
@@ -107,12 +110,16 @@ class BatchPredictRequest(BaseModel):
         description=f"List of SMILES (max {MAX_BATCH_SIZE})",
     )
     explain: bool = Field(False, description="Include explanations for each molecule")
+    uncertainty_samples: int = Field(
+        0, ge=0, le=50, description="Number of MC Dropout samples for uncertainty estimation"
+    )
 
 
 class PredictionResult(BaseModel):
     smiles: str
     standardized_smiles: str
     predictions: dict[str, float]
+    uncertainty_std: Optional[dict[str, float]] = None
     explanation: Optional[dict] = None
     error: Optional[str] = None
 
@@ -154,7 +161,9 @@ async def model_info():
     )
 
 
-def _predict_single(smiles: str, explain: bool = False) -> PredictionResult:
+def _predict_single(
+    smiles: str, explain: bool = False, uncertainty_samples: int = 0
+) -> PredictionResult:
     """Core prediction logic for a single SMILES."""
     std_smiles = standardize_smiles(smiles)
     if not std_smiles:
@@ -177,13 +186,26 @@ def _predict_single(smiles: str, explain: bool = False) -> PredictionResult:
     graph.batch = torch.zeros(graph.x.size(0), dtype=torch.long)
 
     with torch.no_grad():
+        # Standard prediction
         out = ml_models["model"](graph)
         pred = torch.sigmoid(out).item()
+
+        # Uncertainty estimation via MC Dropout
+        uncertainty_std = None
+        if uncertainty_samples > 0:
+            samples = []
+            for _ in range(uncertainty_samples):
+                s_out = ml_models["model"](graph, mc_dropout=True)
+                samples.append(torch.sigmoid(s_out).item())
+
+            samples_ts = torch.tensor(samples)
+            uncertainty_std = {"task_1": round(samples_ts.std().item(), 6)}
 
     result = PredictionResult(
         smiles=smiles,
         standardized_smiles=std_smiles,
         predictions={"task_1": round(pred, 6)},
+        uncertainty_std=uncertainty_std,
     )
 
     if explain and ml_models.get("explainer") is not None:
@@ -207,7 +229,7 @@ async def predict(req: PredictRequest):
     if ml_models.get("model") is None:
         raise HTTPException(status_code=503, detail="Model is not loaded on the server.")
 
-    result = _predict_single(req.smiles, req.explain)
+    result = _predict_single(req.smiles, req.explain, req.uncertainty_samples)
     if result.error:
         raise HTTPException(status_code=400, detail=result.error)
     return result
@@ -236,7 +258,7 @@ async def predict_batch(req: BatchPredictRequest):
 
     results = []
     for smiles in req.smiles_list:
-        result = _predict_single(smiles, req.explain)
+        result = _predict_single(smiles, req.explain, req.uncertainty_samples)
         results.append(result)
 
     return results

@@ -4,6 +4,7 @@ from collections import defaultdict
 from typing import List, Tuple
 
 import numpy as np
+import pandas as pd
 from rdkit import Chem
 from rdkit.Chem.Scaffolds import MurckoScaffold
 
@@ -142,3 +143,34 @@ def scaffold_kfold(
         splits.append((train_inds, val_inds))
 
     return splits
+
+
+def temporal_split(
+    df: pd.DataFrame,
+    time_col: str,
+    frac_train: float = 0.8,
+    frac_val: float = 0.1,
+    frac_test: float = 0.1,
+) -> Tuple[List[int], List[int], List[int]]:
+    """
+    Perform a temporal split on a dataframe.
+
+    Sorts by time_col and allocates the earliest molecules to train
+    and the latest to test. This simulates the real-world scenario
+    of predicting future assay results.
+    """
+    np.testing.assert_almost_equal(frac_train + frac_val + frac_test, 1.0)
+
+    # Sort indices by time column
+    sorted_df = df.sort_values(by=time_col)
+    indices = sorted_df.index.tolist()
+
+    n = len(indices)
+    train_cutoff = int(frac_train * n)
+    val_cutoff = int((frac_train + frac_val) * n)
+
+    train_inds = indices[:train_cutoff]
+    val_inds = indices[train_cutoff:val_cutoff]
+    test_inds = indices[val_cutoff:]
+
+    return train_inds, val_inds, test_inds

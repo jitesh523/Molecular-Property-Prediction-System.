@@ -137,6 +137,12 @@ def main():
     out_path = out_dir / f"umap_{args.dataset}_{args.representation}.png"
     plt.savefig(out_path, dpi=300)
     log.info(f"Saved plot to {out_path}")
+    
+    # Save CSV for interactive dashboard
+    csv_path = out_dir / f"umap_{args.dataset}_{args.representation}.csv"
+    df.to_csv(csv_path, index=False)
+    log.info(f"Saved CSV data to {csv_path}")
+    
     plt.show()
 
 

@@ -45,6 +45,9 @@ def main():
     parser.add_argument("--dataset", type=str, default="bbbp", help="Dataset name")
     parser.add_argument("--top_n", type=int, default=20, help="Number of outliers to analyze")
     parser.add_argument("--output_dir", type=str, default="results/analysis/errors")
+    parser.add_argument("--explain", action="store_true", help="Generate GNN explanations for outliers")
+    parser.add_argument("--model_type", type=str, default="gat", help="GNN type for explanations")
+    parser.add_argument("--weights", type=str, help="Path to weights for explanations")
     args = parser.parse_args()
 
     out_dir = Path(args.output_dir)
@@ -113,6 +116,40 @@ def main():
     report_path = out_dir / f"{args.dataset}_outliers.csv"
     outliers.to_csv(report_path, index=False)
     log.info(f"Saved outlier report to {report_path}")
+
+    # 7. (Optional) Explain Outliers
+    if args.explain:
+        from molprop.serving.load_model import load_gnn_model
+        from molprop.models.explain import get_explainer, explain_graph
+        from molprop.models.visualize_explanations import get_explanation_image
+        from molprop.features.graphs import smiles_to_graph
+        import torch
+
+        if not args.weights:
+            log.error("Weights path required for explanations.")
+            return
+
+        log.info("Generating explanations for top outliers...")
+        model = load_gnn_model(args.model_type, args.weights)
+        explainer = get_explainer(
+            model, 
+            task_type="regression" if "regression" in args.preds else "binary_classification",
+            algorithm="captum"
+        )
+        
+        exp_dir = out_dir / "explanations"
+        exp_dir.mkdir(exist_ok=True)
+
+        for i, row in outliers.iterrows():
+            s = row["std_smiles"]
+            data = smiles_to_graph(s)
+            if data:
+                explanation = explain_graph(explainer, data.x, data.edge_index, data.edge_attr)
+                svg = get_explanation_image(s, explanation)
+                svg_path = exp_dir / f"outlier_{i}.svg"
+                with open(svg_path, "w") as f:
+                    f.write(svg)
+        log.info(f"Saved {len(outliers)} outlier explanations to {exp_dir}")
 
 
 if __name__ == "__main__":

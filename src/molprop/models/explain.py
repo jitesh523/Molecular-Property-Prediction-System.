@@ -2,7 +2,7 @@ from typing import Any, Optional
 
 import torch
 from torch_geometric.data import Data
-from torch_geometric.explain import Explainer, GNNExplainer
+from torch_geometric.explain import CaptumExplainer, Explainer, GNNExplainer
 
 
 class ModelWrapper(torch.nn.Module):
@@ -22,15 +22,28 @@ class ModelWrapper(torch.nn.Module):
         return self.model(data)
 
 
-def get_explainer(model: torch.nn.Module, task_type: str = "binary_classification") -> Explainer:
+def get_explainer(
+    model: torch.nn.Module, 
+    task_type: str = "binary_classification",
+    algorithm: str = "gnn"
+) -> Explainer:
     """
-    Sets up a PyG Explainer for the given model using GNNExplainer.
+    Sets up a PyG Explainer for the given model.
+    algorithm: 'gnn' (GNNExplainer) or 'captum' (IntegratedGradients).
     task_type can be 'binary_classification', 'multiclass_classification', or 'regression'.
     """
     wrapper = ModelWrapper(model)
+    
+    if algorithm == "gnn":
+        algo = GNNExplainer(epochs=200)
+    elif algorithm == "captum":
+        algo = CaptumExplainer("IntegratedGradients")
+    else:
+        raise ValueError(f"Unknown algorithm: {algorithm}")
+
     return Explainer(
         model=wrapper,
-        algorithm=GNNExplainer(epochs=200),
+        algorithm=algo,
         explanation_type="model",
         node_mask_type="attributes",
         edge_mask_type="object",

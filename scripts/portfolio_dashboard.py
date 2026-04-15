@@ -11,6 +11,8 @@ import os
 from molprop.data.standardize import standardize_smiles
 from molprop.features.graphs import smiles_to_graph
 from molprop.serving.load_model import load_gnn_model
+from molprop.models.explain import get_explainer, explain_graph
+from molprop.models.visualize_explanations import get_explanation_image
 
 st.set_page_config(
     page_title="Molecular Property Prediction Explorer",
@@ -102,8 +104,26 @@ with tab_pred:
                         else:
                             st.metric("LogS (Solubility)", f"{mean_val:.2f}")
                         st.write(f"**Uncertainty (MC Dropout σ):** {std_val:.4f}")
-                    else:
-                        st.error("Prediction failed.")
+                    
+                    st.divider()
+                    if st.button("✨ Explain Decision"):
+                        with st.spinner("Generating attribution map..."):
+                            # Setup explainer (using Captum/IntegratedGradients for speed)
+                            task_type = "binary_classification" if "BBBP" in dataset_choice else "regression"
+                            explainer = get_explainer(model, task_type=task_type, algorithm="captum")
+                            
+                            std_smiles = standardize_smiles(smiles_input)
+                            data = smiles_to_graph(std_smiles)
+                            
+                            explanation = explain_graph(explainer, data.x, data.edge_index, data.edge_attr)
+                            svg_data = get_explanation_image(std_smiles, explanation)
+                            
+                            if svg_data:
+                                st.subheader("Structural Evidence")
+                                st.write("The highlighted atoms contribute most to this prediction.")
+                                st.image(io.BytesIO(svg_data.encode()), use_column_width=True)
+                            else:
+                                st.error("Failed to generate explanation.")
                 else:
                     st.warning(f"Model weights for {dataset_choice} not found.")
         else:

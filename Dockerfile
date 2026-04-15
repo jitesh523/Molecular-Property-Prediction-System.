@@ -38,7 +38,9 @@ RUN pip install --no-cache-dir \
     scikit-learn==1.8.0 \
     numpy==1.26.4 \
     joblib>=1.3.0 \
-    shap>=0.46.0
+    shap>=0.46.0 \
+    streamlit>=1.32.0 \
+    plotly>=5.19.0
 
 # Copy built package and install it
 COPY --from=builder /app/dist/*.whl ./

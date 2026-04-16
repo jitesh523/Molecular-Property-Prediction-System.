@@ -1,0 +1,52 @@
+name: Model Benchmarking
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'src/molprop/**'
+      - 'scripts/train_gnn.py'
+      - 'scripts/run_baselines.py'
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install .
+          # Install core ML stack for benchmarking
+          pip install torch torch-geometric rdkit scikit-learn xgboost pandas numpy matplotlib seaborn rich
+
+      - name: Run Smoke Test Benchmark
+        run: |
+          # Create dummy data directory structure if needed or use small subset
+          mkdir -p data/processed/bbbp
+          # We'll use a 10% subset for the CI benchmark to save time
+          python scripts/download_molnet_datasets.py --datasets bbbp
+          python -c "from molprop.data.processor import process_all_benchmark_datasets; from pathlib import Path; process_all_benchmark_datasets(Path('data/raw'), Path('data/processed'))"
+          
+          # Run baselines only for CI speed
+          python scripts/generate_benchmark.py --datasets bbbp --skip-gnn
+          
+          # Generate whitepaper
+          python scripts/generate_whitepaper.py
+
+      - name: Archive Benchmark Results
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-results
+          path: |
+            results/benchmark_table.csv
+            results/WHITE-PAPER.md

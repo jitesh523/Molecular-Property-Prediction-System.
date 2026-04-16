@@ -117,7 +117,33 @@ def main():
     outliers.to_csv(report_path, index=False)
     log.info(f"Saved outlier report to {report_path}")
 
-    # 7. (Optional) Explain Outliers
+    # 7. Scaffold Analysis (SDI)
+    from rdkit.Chem.Scaffolds import MurckoScaffold
+    log.info("Calculating Scaffold Difficulty Index (SDI)...")
+    
+    def get_scaffold(smiles):
+        mol = Chem.MolFromSmiles(smiles)
+        if mol:
+            try:
+                return MurckoScaffold.MurckoScaffoldSmiles(smiles=smiles, includeChirality=False)
+            except:
+                return "Unknown"
+        return "Unknown"
+
+    df["scaffold"] = df["std_smiles"].apply(get_scaffold)
+    scaffold_stats = df.groupby("scaffold").agg({
+        "error": ["mean", "count", "std"]
+    }).reset_index()
+    scaffold_stats.columns = ["scaffold", "mean_error", "count", "std_error"]
+    
+    # Filter for scaffolds appearing at least twice to avoid single-molecule noise
+    hard_scaffolds = scaffold_stats[scaffold_stats["count"] >= 2].sort_values(by="mean_error", ascending=False).head(10)
+    
+    sdi_path = out_dir / f"{args.dataset}_scaffold_bias.csv"
+    hard_scaffolds.to_csv(sdi_path, index=False)
+    log.info(f"Saved scaffold bias report to {sdi_path}")
+
+    # 8. (Optional) Explain Outliers
     if args.explain:
         from molprop.serving.load_model import load_gnn_model
         from molprop.models.explain import get_explainer, explain_graph

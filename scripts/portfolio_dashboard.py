@@ -79,7 +79,7 @@ dataset_choice = st.sidebar.selectbox(
 model = get_model("gat", dataset_choice)
 
 # Tabs for different views
-tab_pred, tab_viz, tab_about = st.tabs(["🔍 Prediction Explorer", "📊 Chemical Space", "ℹ️ About the Project"])
+tab_pred, tab_viz, tab_bench, tab_about = st.tabs(["🔍 Prediction Explorer", "📊 Chemical Space", "🏆 Benchmarks", "ℹ️ About the Project"])
 
 with tab_pred:
     st.header("Single Molecule Prediction")
@@ -155,6 +155,25 @@ with tab_viz:
         st.plotly_chart(fig, use_container_width=True)
     else:
         st.info(f"UMAP data for {dataset_name} not found. Run `python scripts/visualize_chemical_space.py --dataset {dataset_name}` to generate it.")
+
+with tab_bench:
+    st.header("Model Performance Benchmarks")
+    st.markdown("Automated comparison of all implemented architectures across multiple datasets.")
+    
+    whitepaper_path = "results/WHITE-PAPER.md"
+    if os.path.exists(whitepaper_path):
+        with open(whitepaper_path, "r") as f:
+            st.markdown(f.read())
+    else:
+        st.info("Technical whitepaper not found. Run `python scripts/generate_whitepaper.py` to generate the full report.")
+        
+    csv_path = "results/benchmark_table.csv"
+    if os.path.exists(csv_path):
+        st.subheader("Raw Metric Data")
+        df_bench = pd.read_csv(csv_path)
+        st.dataframe(df_bench.style.highlight_max(axis=0, subset=["R²", "ROC-AUC", "PR-AUC"], color="lightgreen"))
+    else:
+        st.info("Benchmark table not found. Run `python scripts/generate_benchmark.py` first.")
 
 with tab_about:
     st.header("Technical Implementation")

@@ -60,9 +60,9 @@ pdf_content.txt
 *.pt
 
 # Generated results (keep .gitkeep)
-results/*.csv
-results/*.md
-results/*.png
+# results/*.csv
+# results/*.md
+# results/*.png
 results/*.json
 results/explanations/
 results/hpo/

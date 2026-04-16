@@ -1,12 +1,13 @@
 # 🧬 Molecular Property Prediction System
 
-A production-grade, end-to-end machine learning platform for predicting molecular properties from chemical structures. Built as a comprehensive ML engineering portfolio piece demonstrating the full lifecycle—from raw data ingestion through model interpretability to Dockerized API deployment.
+A production-grade, end-to-end machine learning platform for predicting molecular properties from chemical structures. Built as a comprehensive ML engineering portfolio piece demonstrating the full lifecycle—from raw data ingestion to **3D structural analysis** and **interactive dashboard deployment**.
 
 [![CI](https://github.com/jitesh523/Molecular-Property-Prediction-System./actions/workflows/ci.yml/badge.svg)](https://github.com/jitesh523/Molecular-Property-Prediction-System./actions)
+[![Benchmark CI](https://github.com/jitesh523/Molecular-Property-Prediction-System./actions/workflows/benchmarks.yml/badge.svg)](https://github.com/jitesh523/Molecular-Property-Prediction-System./actions)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://python.org)
+[![Interactive Demo](https://img.shields.io/badge/demo-streamlit-red.svg)](http://localhost:8501)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Status: Active](https://img.shields.io/badge/status-active-brightgreen.svg)](https://github.com/jitesh523/Molecular-Property-Prediction-System.)
-[![Coverage](https://img.shields.io/badge/coverage-85%25-green.svg)](https://github.com/jitesh523/Molecular-Property-Prediction-System.)
+[![Portfolio Completion: 100%](https://img.shields.io/badge/portfolio-complete-brightgreen.svg)](docs/PORTFOLIO.md)
 
 ---
 

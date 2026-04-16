@@ -13,6 +13,8 @@ from molprop.features.graphs import smiles_to_graph
 from molprop.serving.load_model import load_gnn_model
 from molprop.models.explain import get_explainer, explain_graph
 from molprop.models.visualize_explanations import get_explanation_image
+from molprop.features.conformers import generate_3d_conformer, mol_to_pdb
+import stpy3dmol
 
 st.set_page_config(
     page_title="Molecular Property Prediction Explorer",
@@ -79,7 +81,7 @@ dataset_choice = st.sidebar.selectbox(
 model = get_model("gat", dataset_choice)
 
 # Tabs for different views
-tab_pred, tab_viz, tab_bench, tab_about = st.tabs(["🔍 Prediction Explorer", "📊 Chemical Space", "🏆 Benchmarks", "ℹ️ About the Project"])
+tab_pred, tab_viz, tab_bench, tab_3d, tab_about = st.tabs(["🔍 Prediction Explorer", "📊 Chemical Space", "🏆 Benchmarks", "🧊 3D Inspector", "ℹ️ About the Project"])
 
 with tab_pred:
     st.header("Single Molecule Prediction")
@@ -174,6 +176,33 @@ with tab_bench:
         st.dataframe(df_bench.style.highlight_max(axis=0, subset=["R²", "ROC-AUC", "PR-AUC"], color="lightgreen"))
     else:
         st.info("Benchmark table not found. Run `python scripts/generate_benchmark.py` first.")
+
+with tab_3d:
+    st.header("Interactive 3D Structure Inspector")
+    st.markdown("Generate and explore the 3D optimized geometry (MMFF94) of the molecule.")
+    
+    smiles_3d = st.text_input("Enter SMILES for 3D generation:", smiles_input, key="3d_input")
+    
+    if smiles_3d:
+        with st.spinner("Embedding and optimizing conformer..."):
+            mol_3d = generate_3d_conformer(smiles_3d)
+            if mol_3d:
+                pdb_block = mol_to_pdb(mol_3d)
+                
+                col_ctrl, col_view = st.columns([1, 3])
+                with col_ctrl:
+                    style = st.selectbox("Style", ["stick", "sphere", "line", "cartoon"])
+                    spin = st.checkbox("Spin molecule", value=False)
+                
+                with col_view:
+                    view = stpy3dmol.make_3d_view(pdb_block, format='pdb')
+                    view.setStyle({style: {'colorscheme': 'CPK'}})
+                    if spin:
+                        view.spin(True)
+                    view.setBackgroundColor('#f8f9fa')
+                    view.render()
+            else:
+                st.error("3D Conformer generation failed.")
 
 with tab_about:
     st.header("Technical Implementation")

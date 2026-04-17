@@ -106,7 +106,8 @@ def load_gnn_model(
     else:
         raise ValueError(f"Unknown model_type: {model_type}")
 
-    model.load_state_dict(torch.load(weights_path, map_location=device))
+    # nosec: B614 - loading local trusted weights
+    model.load_state_dict(torch.load(weights_path, map_location=device, weights_only=True))
     model.to(device)
     model.eval()
     log.info(f"Loaded {model_type} model from {weights_path}")

@@ -1,0 +1,12 @@
+cmd: python scripts/download_molnet_datasets.py
+deps:
+- path: scripts/download_molnet_datasets.py
+  hash: md5
+  md5: 0c976a8c9f6d26cd2b2ce6b7276a6383
+  size: 12115
+outs:
+- path: data/raw/
+  hash: md5
+  md5: 8bd93e43250d11cb530f1a1d6997a132.dir
+  size: 40449650
+  nfiles: 32

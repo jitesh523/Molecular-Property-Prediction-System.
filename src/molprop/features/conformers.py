@@ -13,6 +13,7 @@ from rdkit.Chem import AllChem
 
 log = logging.getLogger(__name__)
 
+
 def generate_3d_conformer(smiles: str, num_attempts: int = 10) -> Optional[Chem.Mol]:
     """
     Generate a single, optimized 3D conformer for a SMILES string.
@@ -27,7 +28,7 @@ def generate_3d_conformer(smiles: str, num_attempts: int = 10) -> Optional[Chem.
     # Embed molecule in 3D space using ETKDG (Experimental-Torsion Knowledge Distance Geometry)
     params = AllChem.ETKDGv3()
     params.randomSeed = 42
-    
+
     embed_res = AllChem.EmbedMolecule(mol, params)
     if embed_res == -1:
         log.warning(f"Could not embed molecule: {smiles}")
@@ -43,9 +44,11 @@ def generate_3d_conformer(smiles: str, num_attempts: int = 10) -> Optional[Chem.
 
     return mol
 
+
 def mol_to_xyz(mol: Chem.Mol) -> str:
     """Helper to convert RDKit molecule to XYZ format string."""
     return Chem.MolToXYZBlock(mol)
+
 
 def mol_to_pdb(mol: Chem.Mol) -> str:
     """Helper to convert RDKit molecule to PDB/PDBQT format for 3Dmol.js."""

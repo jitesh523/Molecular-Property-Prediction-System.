@@ -23,9 +23,7 @@ class ModelWrapper(torch.nn.Module):
 
 
 def get_explainer(
-    model: torch.nn.Module, 
-    task_type: str = "binary_classification",
-    algorithm: str = "gnn"
+    model: torch.nn.Module, task_type: str = "binary_classification", algorithm: str = "gnn"
 ) -> Explainer:
     """
     Sets up a PyG Explainer for the given model.
@@ -33,7 +31,7 @@ def get_explainer(
     task_type can be 'binary_classification', 'multiclass_classification', or 'regression'.
     """
     wrapper = ModelWrapper(model)
-    
+
     if algorithm == "gnn":
         algo = GNNExplainer(epochs=200)
     elif algorithm == "captum":

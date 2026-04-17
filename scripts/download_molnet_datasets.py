@@ -236,8 +236,8 @@ def download_file(url: str, dest: Path, retries: int = 3) -> bool:
     """Download url → dest, with simple retry logic."""
     for attempt in range(1, retries + 1):
         try:
-            req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
-            with urllib.request.urlopen(req, timeout=60) as resp:
+            req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})  # noqa: S310
+            with urllib.request.urlopen(req, timeout=60) as resp:  # noqa: S310
                 data = resp.read()
             dest.write_bytes(data)
             return True

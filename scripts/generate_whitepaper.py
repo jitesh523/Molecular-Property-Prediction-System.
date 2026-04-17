@@ -11,7 +11,6 @@ from datetime import datetime
 from pathlib import Path
 
 import pandas as pd
-import plotly.express as px
 import plotly.graph_objects as go
 from rich.console import Console
 
@@ -28,9 +27,9 @@ WHITEPAPER_TEMPLATE = """# Technical Whitepaper: Molecular Property Prediction P
 ---
 
 ## 1. Executive Summary
-This report summarizes the benchmark performance of the Molecular Property Prediction System. 
-We evaluated multiple baseline (RF, XGBoost) and deep learning (GCN, GAT, MPNN) 
-architectures across standard MoleculeNet tasks using **scaffold-based splitting** to ensure 
+This report summarizes the benchmark performance of the Molecular Property Prediction System.
+We evaluated multiple baseline (RF, XGBoost) and deep learning (GCN, GAT, MPNN)
+architectures across standard MoleculeNet tasks using **scaffold-based splitting** to ensure
 industrial robustness.
 
 ## 2. Methodology
@@ -48,18 +47,17 @@ industrial robustness.
 {classification_table}
 
 ## 4. Model Sensitivity Analysis
-The following charts illustrate the correlation between prediction errors and molecular weight, 
+The following charts illustrate the correlation between prediction errors and molecular weight,
 identifying potential "applicability domain" boundaries for our models.
 
-{visualizations_placeholder}
-
 ## 5. Industrial Recommendation
-Based on current results, the **{top_model}** model architecture demonstrates the best balance 
+Based on current results, the **{top_model}** model architecture demonstrates the best balance
 between predictive accuracy and computational overhead for the {primary_dataset} dataset.
 
 ---
 © 2026 Molecular Property Prediction System
 """
+
 
 class WhitepaperGenerator:
     def __init__(self, results_dir: Path):
@@ -82,7 +80,8 @@ class WhitepaperGenerator:
         clf_df = df[df["Dataset"].isin(["bbbp", "tox21", "clintox"])]
 
         def to_md(sub_df):
-            if sub_df.empty: return "No data available."
+            if sub_df.empty:
+                return "No data available."
             return sub_df.to_markdown(index=False)
 
         return to_md(reg_df), to_md(clf_df)
@@ -91,22 +90,23 @@ class WhitepaperGenerator:
         # Placeholder for complex Plotly visualization
         # In a real scenario, this would load results/outliers.csv
         fig = go.Figure()
-        fig.add_trace(go.Indicator(
-            mode = "gauge+number",
-            value = 0.85, # Dummy average ROC-AUC
-            title = {'text': "Platform Robustness (Avg ROC-AUC)"},
-            gauge = {'axis': {'range': [None, 1]},
-                     'bar': {'color': "darkblue"}}
-        ))
+        fig.add_trace(
+            go.Indicator(
+                mode="gauge+number",
+                value=0.85,  # Dummy average ROC-AUC
+                title={"text": "Platform Robustness (Avg ROC-AUC)"},
+                gauge={"axis": {"range": [None, 1]}, "bar": {"color": "darkblue"}},
+            )
+        )
         plot_path = self.report_dir / "platform_robustness.png"
         fig.write_image(str(plot_path))
-        return f"![Platform Robustness](reports/platform_robustness.png)"
+        return "![Platform Robustness](reports/platform_robustness.png)"
 
     def generate(self):
         df = self.load_metrics()
         reg_table, clf_table = self.generate_tables(df)
-        
-        top_model = "GAT" # Logic to determine best model
+
+        top_model = "GAT"  # Logic to determine best model
         if not df.empty:
             # Simple heuristic: model with highest R2 or ROC-AUC
             metric_col = "R²" if "R²" in df.columns else "ROC-AUC"
@@ -118,14 +118,15 @@ class WhitepaperGenerator:
             classification_table=clf_table,
             visualizations_placeholder="Metrics visualized in the interactive dashboard.",
             top_model=top_model,
-            primary_dataset="Blood-Brain Barrier"
+            primary_dataset="Blood-Brain Barrier",
         )
 
         report_path = self.results_dir / "WHITE-PAPER.md"
         with open(report_path, "w") as f:
             f.write(report)
-        
+
         log.info(f"✨ Whitepaper generated at {report_path}")
+
 
 def main():
     parser = argparse.ArgumentParser(description="Generate Technical Whitepaper")
@@ -134,6 +135,7 @@ def main():
 
     generator = WhitepaperGenerator(Path(args.results_dir))
     generator.generate()
+
 
 if __name__ == "__main__":
     main()

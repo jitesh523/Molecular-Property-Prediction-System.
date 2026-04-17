@@ -1,0 +1,34 @@
+schema: '2.0'
+stages:
+  download_data:
+    cmd: python scripts/download_molnet_datasets.py
+    deps:
+    - path: scripts/download_molnet_datasets.py
+      hash: md5
+      md5: 0c976a8c9f6d26cd2b2ce6b7276a6383
+      size: 12115
+    outs:
+    - path: data/raw/
+      hash: md5
+      md5: 8bd93e43250d11cb530f1a1d6997a132.dir
+      size: 40449650
+      nfiles: 32
+  process_data:
+    cmd: python -c "from molprop.data.processor import process_all; 
+      process_all()"
+    deps:
+    - path: data/raw/
+      hash: md5
+      md5: 8bd93e43250d11cb530f1a1d6997a132.dir
+      size: 40449650
+      nfiles: 32
+    - path: src/molprop/data/processor.py
+      hash: md5
+      md5: 9d3492b2b6b72e3fe1edf369e09c1dea
+      size: 3952
+    outs:
+    - path: data/processed/
+      hash: md5
+      md5: 62b5ecf8495ffdd4c8f50b8f36acf5a7.dir
+      size: 378915
+      nfiles: 10

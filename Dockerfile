@@ -25,22 +25,22 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # Install specific Python requirements needed for ML inference
 RUN pip install --no-cache-dir \
-    torch==2.8.0 \
-    torch-geometric==2.7.0 \
+    torch==2.2.1 \
+    torch-geometric==2.5.2 \
     --extra-index-url https://download.pytorch.org/whl/cpu
 
 RUN pip install --no-cache-dir \
-    fastapi==0.115.0 \
-    uvicorn[standard]==0.30.6 \
-    pydantic==2.9.2 \
-    rdkit==2025.09.6 \
-    pandas==2.2.2 \
-    scikit-learn==1.8.0 \
+    fastapi==0.110.0 \
+    uvicorn[standard]==0.27.1 \
+    pydantic==2.6.3 \
+    rdkit==2023.9.5 \
+    pandas==2.2.1 \
+    scikit-learn==1.4.1.post1 \
     numpy==1.26.4 \
     joblib>=1.3.0 \
-    shap>=0.46.0 \
-    streamlit>=1.32.0 \
-    plotly>=5.19.0
+    shap>=0.44.0 \
+    streamlit>=1.31.0 \
+    plotly>=5.18.0
 
 # Copy built package and install it
 COPY --from=builder /app/dist/*.whl ./

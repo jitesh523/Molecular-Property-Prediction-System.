@@ -12,7 +12,7 @@ from typing import Dict, List
 
 import numpy as np
 import pandas as pd
-import torch
+# torch import moved to run_gnn_benchmark to avoid conflicts with XGBoost/OpenMP
 from rich.console import Console
 from sklearn.metrics import (
     average_precision_score,
@@ -89,23 +89,30 @@ def run_baseline_benchmark(
         return []
     target = target_cols[0]
 
+    log.info(f"  Featurizing {len(smiles_list)} SMILES...")
     x = batch_smiles_to_morgan(smiles_list)
     y = df[target].values
+    log.info("  Standardizing targets...")
 
     valid_mask = ~pd.isna(y)
     x, y = x[valid_mask], y[valid_mask]
     smiles_valid = [smiles_list[i] for i in range(len(smiles_list)) if valid_mask[i]]
-
+    log.info(f"  Splitting {len(smiles_valid)} valid samples...")
     train_idx, val_idx, test_idx = random_scaffold_split(smiles_valid)
+    log.info("  Split complete. Training models...")
     x_train, y_train = x[train_idx], y[train_idx]
     x_test, y_test = x[test_idx], y[test_idx]
 
     results = []
     for name, mtype in [("RF", "rf"), ("XGBoost", "xgb")]:
+        log.info(f"    Training {name}...")
         model = BaselineModel(
-            model_type=mtype, task_type=task_type, params={"n_estimators": 500, "random_state": 42}
+            model_type=mtype,
+            task_type=task_type,
+            params={"n_estimators": 100, "random_state": 42, "n_jobs": 1},
         )
         model.train(x_train, y_train)
+        log.info(f"    Evaluating {name}...")
 
         if task_type == "regression":
             y_pred = model.predict(x_test)
@@ -132,116 +139,120 @@ def run_baseline_benchmark(
     return results
 
 
-@torch.no_grad()
 def run_gnn_benchmark(
     dataset_name: str, task_type: str, processed_dir: Path, root_dir: Path
 ) -> List[Dict]:
     """Run GNN models on a dataset (only if trained weights exist)."""
-    data_path = processed_dir / dataset_name / "processed.csv"
-    if not data_path.exists():
-        return []
+    import torch
+    
+    with torch.no_grad():
+        data_path = processed_dir / dataset_name / "processed.csv"
+        if not data_path.exists():
+            return []
 
-    df = pd.read_csv(data_path)
-    target_cols = [c for c in df.columns if c != "std_smiles"]
-    if not target_cols:
-        return []
-    target = target_cols[0]
+        df = pd.read_csv(data_path)
+        target_cols = [c for c in df.columns if c != "std_smiles"]
+        if not target_cols:
+            return []
+        target = target_cols[0]
 
-    # Build graphs
-    dataset = []
-    for _, row in df.iterrows():
-        g = smiles_to_graph(row["std_smiles"], y=row[target])
-        if g:
-            dataset.append(g)
+        # Build graphs
+        dataset = []
+        for _, row in df.iterrows():
+            g = smiles_to_graph(row["std_smiles"], y=row[target])
+            if g:
+                dataset.append(g)
 
-    if not dataset:
-        return []
+        if not dataset:
+            return []
 
-    smiles_list = [g.smiles for g in dataset]
-    _, _, test_idx = random_scaffold_split(smiles_list)
+        smiles_list = [g.smiles for g in dataset]
+        _, _, test_idx = random_scaffold_split(smiles_list)
 
-    if not test_idx:
-        return []
+        if not test_idx:
+            return []
 
-    # Device
-    if torch.backends.mps.is_available():
-        device = torch.device("mps")
-    elif torch.cuda.is_available():
-        device = torch.device("cuda")
-    else:
-        device = torch.device("cpu")
-
-    test_data = [dataset[i] for i in test_idx]
-    test_loader = DataLoader(test_data, batch_size=64)
-    in_dim = dataset[0].num_node_features
-
-    results = []
-    from molprop.models.gnn_gat import GATModel
-    from molprop.models.gnn_gcn import GCNModel
-    from molprop.models.gnn_mpnn import MPNNModel
-
-    model_configs = [
-        (
-            "GCN",
-            GCNModel,
-            {"in_dim": in_dim, "hidden_dim": 128, "out_dim": 1, "num_layers": 3, "dropout": 0.2},
-        ),
-        (
-            "GAT",
-            GATModel,
-            {
-                "in_dim": in_dim,
-                "hidden_dim": 128,
-                "out_dim": 1,
-                "num_layers": 3,
-                "dropout": 0.2,
-                "heads": 4,
-            },
-        ),
-        (
-            "MPNN",
-            MPNNModel,
-            {
-                "in_dim": in_dim,
-                "hidden_dim": 128,
-                "out_dim": 1,
-                "num_layers": 3,
-                "dropout": 0.2,
-                "edge_dim": 4,
-            },
-        ),
-    ]
-
-    for name, model_cls, kwargs in model_configs:
-        weights_path = root_dir / f"best_model_{name.lower()}_{dataset_name}.pt"
-        if not weights_path.exists():
-            log.info(f"  Skipping {name} on {dataset_name}: no weights at {weights_path}")
-            continue
-
-        model = model_cls(**kwargs).to(device)
-        model.load_state_dict(torch.load(weights_path, map_location=device))
-        model.eval()
-
-        y_true_all, y_pred_all = [], []
-        for data in test_loader:
-            data = data.to(device)
-            out = model(data)
-            y_true_all.append(data.y.view(-1, 1).cpu().numpy())
-            if task_type == "classification":
-                y_pred_all.append(torch.sigmoid(out).cpu().numpy())
-            else:
-                y_pred_all.append(out.cpu().numpy())
-
-        y_true = np.concatenate(y_true_all)
-        y_pred = np.concatenate(y_pred_all)
-
-        if task_type == "regression":
-            metrics = evaluate_regression(y_true, y_pred)
+        # Device
+        if torch.backends.mps.is_available():
+            device = torch.device("mps")
+        elif torch.cuda.is_available():
+            device = torch.device("cuda")
         else:
-            y_pred_binary = (y_pred > 0.5).astype(int)
-            metrics = evaluate_classification(y_true, y_pred, y_pred_binary)
+            device = torch.device("cpu")
 
-        results.append({"Dataset": dataset_name, "Model": name, "Split": "Scaffold", **metrics})
+        test_data = [dataset[i] for i in test_idx]
+        test_loader = DataLoader(test_data, batch_size=64)
+        in_dim = dataset[0].num_node_features
+
+        results = []
+        from molprop.models.gnn_gat import GATModel
+        from molprop.models.gnn_gcn import GCNModel
+        from molprop.models.gnn_mpnn import MPNNModel
+
+        model_configs = [
+            (
+                "GCN",
+                GCNModel,
+                {"in_dim": in_dim, "hidden_dim": 128, "out_dim": 1, "num_layers": 3, "dropout": 0.2},
+            ),
+            (
+                "GAT",
+                GATModel,
+                {
+                    "in_dim": in_dim,
+                    "hidden_dim": 128,
+                    "out_dim": 1,
+                    "num_layers": 3,
+                    "dropout": 0.2,
+                    "heads": 4,
+                },
+            ),
+            (
+                "MPNN",
+                MPNNModel,
+                {
+                    "in_dim": in_dim,
+                    "hidden_dim": 128,
+                    "out_dim": 1,
+                    "num_layers": 3,
+                    "dropout": 0.2,
+                    "edge_dim": 4,
+                },
+            ),
+        ]
+
+        for name, model_cls, kwargs in model_configs:
+            weights_path = root_dir / f"best_model_{name.lower()}_{dataset_name}.pt"
+            if not weights_path.exists():
+                log.info(f"  Skipping {name} on {dataset_name}: no weights at {weights_path}")
+                continue
+
+            model = model_cls(**kwargs).to(device)
+            model.load_state_dict(torch.load(weights_path, map_location=device, weights_only=True))
+            model.eval()
+
+            y_true_all, y_pred_all = [], []
+            for data in test_loader:
+                data = data.to(device)
+                out = model(data)
+                y_true_all.append(data.y.view(-1, 1).cpu().numpy())
+                if task_type == "classification":
+                    y_pred_all.append(torch.sigmoid(out).cpu().numpy())
+                else:
+                    y_pred_all.append(out.cpu().numpy())
+
+            y_true = np.concatenate(y_true_all)
+            y_pred = np.concatenate(y_pred_all)
+
+            if task_type == "regression":
+                metrics = evaluate_regression(y_true, y_pred)
+            else:
+                y_pred_binary = (y_pred > 0.5).astype(int)
+                metrics = evaluate_classification(y_true, y_pred, y_pred_binary)
+
+            results.append({"Dataset": dataset_name, "Model": name, "Split": "Scaffold", **metrics})
+
+    return results
 
     return results
 
@@ -276,6 +287,10 @@ def generate_markdown_table(results_df: pd.DataFrame, task_type: str) -> str:
 
 
 def main():
+    # Fix for potential OpenMP runtime conflicts (common cause of segfaults with XGBoost/SKLearn)
+    import os
+    os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
+
     parser = argparse.ArgumentParser(description="Generate benchmark results table")
     parser.add_argument(
         "--datasets",

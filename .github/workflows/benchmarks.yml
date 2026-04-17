@@ -25,11 +25,15 @@ jobs:
       - name: Install dependencies
         run: |
           pip install --upgrade pip
+          # Use specific torch cpu index for stability in headless runner
+          pip install torch==2.2.1 --extra-index-url https://download.pytorch.org/whl/cpu
+          pip install torch-geometric==2.5.2 rdkit==2023.9.5 numpy==1.26.4 pandas==2.2.1
+          pip install scikit-learn==1.4.1.post1 xgboost==2.0.3 matplotlib seaborn rich
           pip install .
-          # Install core ML stack for benchmarking
-          pip install torch torch-geometric rdkit scikit-learn xgboost pandas numpy matplotlib seaborn rich
 
       - name: Run Smoke Test Benchmark
+        env:
+          KMP_DUPLICATE_LIB_OK: "TRUE"
         run: |
           # Create dummy data directory structure if needed or use small subset
           mkdir -p data/processed/bbbp

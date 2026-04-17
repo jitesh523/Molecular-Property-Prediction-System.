@@ -15,10 +15,18 @@ def smiles_to_morgan(
     if mol is None:
         return None
 
-    # GetMorganFingerprintAsBitVect returns a ExplicitBitVect
-    fp = AllChem.GetMorganFingerprintAsBitVect(
-        mol, radius, nBits=n_bits, useChirality=use_chirality
-    )
+    # Use the modern MorganGenerator if available (RDKit 2023.09+)
+    try:
+        from rdkit.Chem import rdFingerprintGenerator
+        gen = rdFingerprintGenerator.GetMorganGenerator(
+            radius=radius, fpSize=n_bits, includeChirality=use_chirality
+        )
+        fp = gen.GetFingerprint(mol)
+    except (ImportError, AttributeError):
+        # Fallback for older versions
+        fp = AllChem.GetMorganFingerprintAsBitVect(
+            mol, radius, nBits=n_bits, useChirality=use_chirality
+        )
 
     # Convert to numpy array
     arr = np.zeros((1,), dtype=np.int8)

@@ -4,12 +4,21 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "molprop"
-version = "0.1.0"
-description = "Molecular Property Prediction System"
+version = "1.1.0"
+description = "A production-grade, end-to-end platform for predicting molecular properties using GNNs."
+keywords = ["molecular-informatics", "gnn", "mlops", "drug-discovery", "pytorch-geometric"]
+license = { text = "MIT" }
 readme = "README.md"
 requires-python = ">=3.11"
 authors = [
-    { name = "Neha", email = "test@example.com" }
+    { name = "Jitesh523", email = "test@example.com" }
+]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.11",
+    "Topic :: Scientific/Engineering :: Bio-Informatics",
 ]
 dependencies = [
     "rdkit>=2023.9.5",
@@ -28,8 +37,13 @@ dependencies = [
     "streamlit>=1.32.0",
     "plotly>=5.19.0",
     "captum>=0.7.0",
-    "stpy3dmol>=0.0.1"
+    "stpy3dmol>=0.0.1",
+    "rich>=13.7.1"
 ]
+
+[project.scripts]
+molprop-dashboard = "molprop.scripts.portfolio_dashboard:main"
+molprop-train = "molprop.scripts.train_gnn:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
@@ -51,7 +65,9 @@ select = [
     "F",   # pyflakes
     "B",   # flake8-bugbear
     "I",   # isort
+    "S",   # flake8-bandit
 ]
 ignore = [
     "E501", # line too long, let formatter handle it
+    "S101", # allow assert for pytest
 ]

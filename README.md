@@ -46,22 +46,29 @@ flowchart LR
 
 ---
 
-## 🖥️ Interactive Exploration Dashboard
+## 🖥️ Interactive Exploration Dashboards
 
-The system includes a premium **Streamlit** dashboard for real-time model interaction and chemical space visualization.
+The system includes two premium interactive web interfaces for real-time model interaction and chemical space visualization.
 
-### Features:
-- **Property Explorer:** Enter any SMILES string to get real-time property predictions.
-- **Uncertainty Quantification:** Visual confidence intervals via Monte Carlo Dropout (10 samples).
-- **Chemical Space Explorer:** Interactive **UMAP** projection of the dataset (Morgan Fingerprints).
-- **Structure Rendering:** High-quality RDKit molecule visualization.
+### 1. Premium Web UI (FastAPI Native)
+A lightning-fast, glassmorphism-inspired HTML/Vanilla CSS frontend built for maximum performance and visual excellence.
+- **Micro-animations & Modern Typography:** Sleek dark-mode interface with Inter font.
+- **Instant Predictions:** Connects directly to the FastAPI backend without full-page reloads.
+- **Structural Explanations:** Dynamic rendering of SVG evidence from `GNNExplainer`.
+
+**Access:** Served directly from `http://localhost:8000/` when running the API.
+
+### 2. Streamlit Analytical Dashboard
+An analytical interface optimized for exploring chemical space and benchmark metrics.
+- **Chemical Space Explorer:** Interactive **UMAP** projection of the dataset.
+- **3D Inspector:** Generates and visualizes MMFF94 optimized conformers.
 
 ### Run with Docker Compose:
 ```bash
 docker-compose up --build
 ```
-- **API:** `http://localhost:8000`
-- **Dashboard:** `http://localhost:8501`
+- **API & Premium UI:** `http://localhost:8000`
+- **Streamlit Analytical Dashboard:** `http://localhost:8501`
 
 ---
 

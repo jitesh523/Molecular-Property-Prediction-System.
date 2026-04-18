@@ -14,11 +14,13 @@ from typing import Optional
 import torch
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from molprop.data.standardize import standardize_smiles
 from molprop.features.graphs import smiles_to_graph
 from molprop.models.explain import explain_graph, get_explainer
+from molprop.models.visualize_explanations import get_explanation_image
 from molprop.serving.load_model import load_gnn_model
 
 log = logging.getLogger(__name__)
@@ -218,7 +220,11 @@ def _predict_single(
         node_mask = explanation.node_mask
         if node_mask is not None:
             atom_importance = node_mask.sum(dim=1).tolist()
-            result.explanation = {"atom_importance": atom_importance}
+            svg_data = get_explanation_image(std_smiles, explanation)
+            result.explanation = {
+                "atom_importance": atom_importance,
+                "svg": svg_data
+            }
 
     return result
 
@@ -262,3 +268,9 @@ async def predict_batch(req: BatchPredictRequest):
         results.append(result)
 
     return results
+
+# Mount static files at the root (ensure this is after all other routes)
+static_dir = os.path.join(os.path.dirname(__file__), "static")
+if os.path.exists(static_dir):
+    app.mount("/", StaticFiles(directory=static_dir, html=True), name="static")
+

@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Molecular Explorer Interface</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="app-container">
+        <header class="glass-panel text-center">
+            <h1>🧬 Molecular Explorer</h1>
+            <p id="app-title">Connecting to API...</p>
+        </header>
+
+        <main>
+            <section class="input-section glass-panel fade-in slide-up">
+                <h2>Generate Prediction</h2>
+                <div class="input-group flex-wrap">
+                    <input type="text" id="smiles-input" placeholder="Enter SMILES string (e.g., CC(=O)OC1=CC=CC=C1C(=O)O)" autocomplete="off">
+                    <button id="predict-btn">Predict →</button>
+                </div>
+                <div class="options">
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="explain-cb" checked>
+                        <span class="slider"></span>
+                        <span class="label-text">Structural Explanation (GNNExplainer)</span>
+                    </label>
+                    <label class="uncertainty-label">
+                        Uncertainty Samples (MC Dropout):
+                        <input type="number" id="uncertainty-input" value="10" min="0" max="50">
+                    </label>
+                </div>
+                <div id="loading" class="spinner hidden"></div>
+            </section>
+
+            <section class="results-section hidden" id="results-panel">
+                <div class="result-card glass-panel flex-col slide-up">
+                    <h3 class="section-title">Inference Results</h3>
+                    <div class="metrics">
+                        <div class="metric highlight-metric">
+                            <span class="label" id="task-label">Predicted Value</span>
+                            <span class="value" id="pred-value">-</span>
+                        </div>
+                        <div class="metric">
+                            <span class="label">Aleatoric/Epistemic Uncertainty</span>
+                            <span class="value" id="pred-uncertainty">-</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="explanation-card glass-panel hidden slide-up" id="explanation-panel">
+                    <h3 class="section-title">Structural Evidence</h3>
+                    <p class="subtitle">Atoms highlighted contribute positively to the prediction via message passing.</p>
+                    <div id="svg-container"></div>
+                </div>
+            </section>
+        </main>
+        
+        <footer>
+            <p>Powered by PyTorch Geometric & FastAPI • Developed for the MLOps Project Portfolio</p>
+        </footer>
+    </div>
+    
+    <script src="main.js"></script>
+</body>
+</html>

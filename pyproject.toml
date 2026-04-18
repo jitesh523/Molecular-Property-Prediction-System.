@@ -37,7 +37,8 @@ dependencies = [
     "streamlit>=1.32.0",
     "plotly>=5.19.0",
     "captum>=0.7.0",
-    "stpy3dmol>=0.0.1",
+    "stmol>=0.1.2",
+    "py3Dmol>=2.0",
     "rich>=13.7.1"
 ]
 

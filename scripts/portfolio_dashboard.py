@@ -4,11 +4,12 @@ import os
 import numpy as np
 import pandas as pd
 import plotly.express as px
-import stpy3dmol
+import py3Dmol
 import streamlit as st
 import torch
 from rdkit import Chem
 from rdkit.Chem import Draw
+from stmol import showmol
 
 from molprop.data.standardize import standardize_smiles
 from molprop.features.conformers import generate_3d_conformer, mol_to_pdb
@@ -229,12 +230,13 @@ with tab_3d:
                     spin = st.checkbox("Spin molecule", value=False)
 
                 with col_view:
-                    view = stpy3dmol.make_3d_view(pdb_block, format="pdb")
+                    view = py3Dmol.view()
+                    view.addModel(pdb_block, "pdb")
                     view.setStyle({style: {"colorscheme": "CPK"}})
                     if spin:
                         view.spin(True)
                     view.setBackgroundColor("#f8f9fa")
-                    view.render()
+                    showmol(view, height=500, width=800)
             else:
                 st.error("3D Conformer generation failed.")
 

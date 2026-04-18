@@ -12,6 +12,7 @@ from typing import Dict, List
 
 import numpy as np
 import pandas as pd
+
 # torch import moved to run_gnn_benchmark to avoid conflicts with XGBoost/OpenMP
 from rich.console import Console
 from sklearn.metrics import (
@@ -144,7 +145,7 @@ def run_gnn_benchmark(
 ) -> List[Dict]:
     """Run GNN models on a dataset (only if trained weights exist)."""
     import torch
-    
+
     with torch.no_grad():
         data_path = processed_dir / dataset_name / "processed.csv"
         if not data_path.exists():
@@ -193,7 +194,13 @@ def run_gnn_benchmark(
             (
                 "GCN",
                 GCNModel,
-                {"in_dim": in_dim, "hidden_dim": 128, "out_dim": 1, "num_layers": 3, "dropout": 0.2},
+                {
+                    "in_dim": in_dim,
+                    "hidden_dim": 128,
+                    "out_dim": 1,
+                    "num_layers": 3,
+                    "dropout": 0.2,
+                },
             ),
             (
                 "GAT",
@@ -289,6 +296,7 @@ def generate_markdown_table(results_df: pd.DataFrame, task_type: str) -> str:
 def main():
     # Fix for potential OpenMP runtime conflicts (common cause of segfaults with XGBoost/SKLearn)
     import os
+
     os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
 
     parser = argparse.ArgumentParser(description="Generate benchmark results table")

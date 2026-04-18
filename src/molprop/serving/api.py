@@ -221,10 +221,7 @@ def _predict_single(
         if node_mask is not None:
             atom_importance = node_mask.sum(dim=1).tolist()
             svg_data = get_explanation_image(std_smiles, explanation)
-            result.explanation = {
-                "atom_importance": atom_importance,
-                "svg": svg_data
-            }
+            result.explanation = {"atom_importance": atom_importance, "svg": svg_data}
 
     return result
 
@@ -269,8 +266,8 @@ async def predict_batch(req: BatchPredictRequest):
 
     return results
 
+
 # Mount static files at the root (ensure this is after all other routes)
 static_dir = os.path.join(os.path.dirname(__file__), "static")
 if os.path.exists(static_dir):
     app.mount("/", StaticFiles(directory=static_dir, html=True), name="static")
-

@@ -18,6 +18,7 @@ def smiles_to_morgan(
     # Use the modern MorganGenerator if available (RDKit 2023.09+)
     try:
         from rdkit.Chem import rdFingerprintGenerator
+
         gen = rdFingerprintGenerator.GetMorganGenerator(
             radius=radius, fpSize=n_bits, includeChirality=use_chirality
         )

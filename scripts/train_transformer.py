@@ -12,7 +12,6 @@ from omegaconf import DictConfig
 from rich.console import Console
 from sklearn.metrics import mean_squared_error, roc_auc_score
 from torch.utils.data import DataLoader
-from tqdm import tqdm
 from transformers import AutoTokenizer
 
 from molprop.data.splits import random_scaffold_split
@@ -28,7 +27,7 @@ def train_one_epoch(model, loader, optimizer, device, task_type):
     model.train()
     total_loss = 0
     total_samples = 0
-    
+
     for batch in loader:
         input_ids = batch["input_ids"].to(device)
         attention_mask = batch["attention_mask"].to(device)
@@ -44,11 +43,11 @@ def train_one_epoch(model, loader, optimizer, device, task_type):
 
         loss.backward()
         optimizer.step()
-        
+
         batch_size = input_ids.size(0)
         total_loss += loss.item() * batch_size
         total_samples += batch_size
-        
+
     return total_loss / total_samples
 
 
@@ -62,7 +61,7 @@ def evaluate(model, loader, device, task_type):
         input_ids = batch["input_ids"].to(device)
         attention_mask = batch["attention_mask"].to(device)
         y = batch["labels"].view(-1, 1).cpu()
-        
+
         out = model(input_ids, attention_mask)
 
         y_true_list.append(y)
@@ -121,14 +120,14 @@ def run_training(cfg: DictConfig):
     # Dataset splits
     smiles_list = df["std_smiles"].tolist()
     train_idx, val_idx, test_idx = random_scaffold_split(smiles_list)
-    
+
     # Sub-dataframe mapping
     train_df = df.iloc[train_idx].reset_index(drop=True)
     val_df = df.iloc[val_idx].reset_index(drop=True)
     test_df = df.iloc[test_idx].reset_index(drop=True)
 
     max_length = cfg.model.get("max_length", 128)
-    
+
     # We pass 'std_smiles' and rename it inside the Dataset structure logic?
     # Wait, our dataset class expects "smiles". We will rename std_smiles to smiles before passing
     train_df = train_df.rename(columns={"std_smiles": "smiles"})
@@ -145,13 +144,13 @@ def run_training(cfg: DictConfig):
 
     # Model
     model = SMILESTransformer(
-        model_name=cfg.model.hf_model_name,
-        num_tasks=1,
-        dropout=cfg.model.dropout
+        model_name=cfg.model.hf_model_name, num_tasks=1, dropout=cfg.model.dropout
     ).to(device)
 
     # Transformers learning rates
-    optimizer = torch.optim.AdamW(model.parameters(), lr=cfg.model.learning_rate, weight_decay=cfg.model.weight_decay)
+    optimizer = torch.optim.AdamW(
+        model.parameters(), lr=cfg.model.learning_rate, weight_decay=cfg.model.weight_decay
+    )
 
     run_name = f"{cfg.model.name}_{cfg.dataset.name}"
     with mlflow.start_run(run_name=run_name):
@@ -210,6 +209,7 @@ def main():
         overrides = sys.argv[1:]
         cfg = compose(config_name="config", overrides=overrides)
         run_training(cfg)
+
 
 if __name__ == "__main__":
     main()

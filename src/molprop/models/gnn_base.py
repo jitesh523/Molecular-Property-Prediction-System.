@@ -54,12 +54,6 @@ class GNNBase(nn.Module):
         Extract the latent embedding (bottleneck) for vector search.
         """
         self.eval()
-        x, edge_index, batch = data.x, data.edge_index, data.batch
-        
-        # Subclasses often use self.convs + self.readout
-        # But since I know the structure, I'll just use the first parts of forward
-        # However, to be general, we should let subclasses override encode or call them.
-        # Actually, let's just make it a standard part of the interface.
         raise NotImplementedError("Subclasses must implement the encode pass.")
 
     def get_device(self):

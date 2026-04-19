@@ -9,10 +9,11 @@ import logging
 import os
 import time
 from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import Optional
 
+import pandas as pd
 import torch
-from pathlib import Path
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -24,7 +25,6 @@ from molprop.models.explain import explain_graph, get_explainer
 from molprop.models.visualize_explanations import get_explanation_image
 from molprop.serving.load_model import load_gnn_model
 from molprop.serving.vector_db import vector_store
-import pandas as pd
 
 log = logging.getLogger(__name__)
 
@@ -51,7 +51,7 @@ async def lifespan(app: FastAPI):
         ml_models["task"] = task
         ml_models["explainer"] = get_explainer(model, task_type="binary_classification")
         log.info(f"Model loaded: {model_type} ({weights_path})")
-        
+
         # --- Populate Vector DB ---
         try:
             root_dir = Path(__file__).resolve().parent.parent.parent.parent
@@ -59,7 +59,7 @@ async def lifespan(app: FastAPI):
             if data_path.exists():
                 df = pd.read_csv(data_path)
                 log.info(f"Indexing {len(df)} molecules for vector search...")
-                
+
                 points = []
                 for i, row in df.iterrows():
                     smiles = row["std_smiles"]
@@ -69,11 +69,16 @@ async def lifespan(app: FastAPI):
                         embedding = model.encode(g).squeeze(0).cpu().numpy().tolist()
                         if vector_store.vector_size is None:
                             vector_store.create_collection(len(embedding))
-                        points.append({
-                            "id": i,
-                            "vector": embedding,
-                            "payload": {"smiles": smiles, "task_value": float(target) if pd.notnull(target) else 0.0}
-                        })
+                        points.append(
+                            {
+                                "id": i,
+                                "vector": embedding,
+                                "payload": {
+                                    "smiles": smiles,
+                                    "task_value": float(target) if pd.notnull(target) else 0.0,
+                                },
+                            }
+                        )
                 vector_store.upsert_molecules(points)
                 log.info("Vector DB indexing complete.")
         except Exception as e:

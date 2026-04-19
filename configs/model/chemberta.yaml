@@ -1,0 +1,9 @@
+name: "chemberta"
+hf_model_name: "DeepChem/ChemBERTa-77M-MLM"
+dropout: 0.1
+learning_rate: 0.00005  # Transformers require lower learning rates than GNNs
+weight_decay: 0.01
+batch_size: 16
+epochs: 10
+patience: 3
+max_length: 128

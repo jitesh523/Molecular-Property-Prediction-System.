@@ -12,6 +12,7 @@ from contextlib import asynccontextmanager
 from typing import Optional
 
 import torch
+from pathlib import Path
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -22,6 +23,8 @@ from molprop.features.graphs import smiles_to_graph
 from molprop.models.explain import explain_graph, get_explainer
 from molprop.models.visualize_explanations import get_explanation_image
 from molprop.serving.load_model import load_gnn_model
+from molprop.serving.vector_db import vector_store
+import pandas as pd
 
 log = logging.getLogger(__name__)
 
@@ -48,6 +51,33 @@ async def lifespan(app: FastAPI):
         ml_models["task"] = task
         ml_models["explainer"] = get_explainer(model, task_type="binary_classification")
         log.info(f"Model loaded: {model_type} ({weights_path})")
+        
+        # --- Populate Vector DB ---
+        try:
+            root_dir = Path(__file__).resolve().parent.parent.parent.parent
+            data_path = root_dir / "data" / "processed" / dataset / "processed.csv"
+            if data_path.exists():
+                df = pd.read_csv(data_path)
+                log.info(f"Indexing {len(df)} molecules for vector search...")
+                
+                points = []
+                for i, row in df.iterrows():
+                    smiles = row["std_smiles"]
+                    target = row.get(ml_models["task"], row.get(df.columns[-1]))
+                    g = smiles_to_graph(smiles)
+                    if g:
+                        embedding = model.encode(g).squeeze(0).cpu().numpy().tolist()
+                        if vector_store.vector_size is None:
+                            vector_store.create_collection(len(embedding))
+                        points.append({
+                            "id": i,
+                            "vector": embedding,
+                            "payload": {"smiles": smiles, "task_value": float(target) if pd.notnull(target) else 0.0}
+                        })
+                vector_store.upsert_molecules(points)
+                log.info("Vector DB indexing complete.")
+        except Exception as e:
+            log.error(f"Failed to populate vector DB: {e}")
     else:
         ml_models["model"] = None
         ml_models["explainer"] = None
@@ -123,6 +153,7 @@ class PredictionResult(BaseModel):
     predictions: dict[str, float]
     uncertainty_std: Optional[dict[str, float]] = None
     explanation: Optional[dict] = None
+    similar_molecules: Optional[list[dict]] = None
     error: Optional[str] = None
 
 
@@ -209,6 +240,13 @@ def _predict_single(
         predictions={"task_1": round(pred, 6)},
         uncertainty_std=uncertainty_std,
     )
+
+    # --- Vector Search for Structural Analogs ---
+    try:
+        query_vec = ml_models["model"].encode(graph).squeeze(0).cpu().numpy().tolist()
+        result.similar_molecules = vector_store.search_similar(query_vec, top_k=5)
+    except Exception as e:
+        log.warning(f"Similarity search failed: {e}")
 
     if explain and ml_models.get("explainer") is not None:
         explanation = explain_graph(

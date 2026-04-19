@@ -47,3 +47,12 @@ class GATModel(GNNBase):
 
         # Prediction Head
         return self.mlp(x)
+
+    @torch.no_grad()
+    def encode(self, data):
+        x, edge_index, batch = data.x, data.edge_index, data.batch
+        for i, conv in enumerate(self.convs):
+            x = conv(x, edge_index)
+            if i < len(self.convs) - 1:
+                x = F.elu(x)
+        return self.pooling(x, batch)

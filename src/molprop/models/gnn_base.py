@@ -1,3 +1,4 @@
+import torch
 import torch.nn as nn
 from torch_geometric.nn import global_max_pool, global_mean_pool
 
@@ -46,6 +47,20 @@ class GNNBase(nn.Module):
 
     def forward(self, data):
         raise NotImplementedError("Subclasses must implement the forward pass.")
+
+    @torch.no_grad()
+    def encode(self, data):
+        """
+        Extract the latent embedding (bottleneck) for vector search.
+        """
+        self.eval()
+        x, edge_index, batch = data.x, data.edge_index, data.batch
+        
+        # Subclasses often use self.convs + self.readout
+        # But since I know the structure, I'll just use the first parts of forward
+        # However, to be general, we should let subclasses override encode or call them.
+        # Actually, let's just make it a standard part of the interface.
+        raise NotImplementedError("Subclasses must implement the encode pass.")
 
     def get_device(self):
         """Helper to get the model's device."""

@@ -11,6 +11,8 @@ document.addEventListener("DOMContentLoaded", () => {
     const explanationPanel = document.getElementById("explanation-panel");
     const taskLabel = document.getElementById("task-label");
     const appTitle = document.getElementById("app-title");
+    const similarityPanel = document.getElementById("similarity-panel");
+    const analogsContainer = document.getElementById("analogs-container");
 
     // Fetch active model info on load
     fetch("/model/info")
@@ -48,6 +50,7 @@ document.addEventListener("DOMContentLoaded", () => {
         // Reset UI state
         resultsPanel.classList.add("hidden");
         explanationPanel.classList.add("hidden");
+        similarityPanel.classList.add("hidden");
         loading.classList.remove("hidden");
         predictBtn.disabled = true;
         predictBtn.textContent = "Predicting...";
@@ -97,6 +100,21 @@ document.addEventListener("DOMContentLoaded", () => {
                     svg.style.width = "100%";
                     svg.style.height = "auto";
                 }
+            }
+
+            // Display Similar Molecules (Vector Search Analogs)
+            if (data.similar_molecules && data.similar_molecules.length > 0) {
+                analogsContainer.innerHTML = '';
+                data.similar_molecules.forEach(mol => {
+                    const item = document.createElement("div");
+                    item.className = "analog-item animate-fade-in";
+                    item.innerHTML = `
+                        <div class="analog-score">Similarity: ${(mol.score * 100).toFixed(1)}%</div>
+                        <span class="analog-smiles">${mol.smiles}</span>
+                    `;
+                    analogsContainer.appendChild(item);
+                });
+                similarityPanel.classList.remove("hidden");
             }
 
             // Reflow and animated display

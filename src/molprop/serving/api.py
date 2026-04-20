@@ -19,17 +19,20 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
+from molprop.data.smiles_vocab import SmilesVocab
 from molprop.data.standardize import standardize_smiles
 from molprop.features.graphs import smiles_to_graph
 from molprop.models.explain import explain_graph, get_explainer
+from molprop.models.vae import SMILESVAE
 from molprop.models.visualize_explanations import get_explanation_image
 from molprop.serving.load_model import load_gnn_model
 from molprop.serving.vector_db import vector_store
 
 log = logging.getLogger(__name__)
 
-# Global state for loaded model
+# Global state for loaded model + VAE
 ml_models = {}
+vae_state: dict = {}
 
 
 @asynccontextmanager
@@ -87,20 +90,48 @@ async def lifespan(app: FastAPI):
         ml_models["model"] = None
         ml_models["explainer"] = None
         log.warning(f"No weights found at {weights_path}; API running without model.")
+
+    # ── Load VAE (optional) ───────────────────────────────────────────────────
+    vae_dataset = os.getenv("VAE_DATASET", dataset)
+    vae_ckpt = ROOT / f"best_model_vae_{vae_dataset}.pt"
+    vocab_path = ROOT / f"vocab_vae_{vae_dataset}.json"
+    if vae_ckpt.exists() and vocab_path.exists():
+        try:
+            ck = torch.load(vae_ckpt, map_location="cpu", weights_only=False)
+            vocab = SmilesVocab.load(vocab_path)
+            vae = SMILESVAE(
+                vocab_size=ck["vocab_size"],
+                latent_dim=ck["latent_dim"],
+                hidden_dim=ck["hidden_dim"],
+            )
+            vae.load_state_dict(ck["state_dict"])
+            vae.eval()
+            vae_state["model"] = vae
+            vae_state["vocab"] = vocab
+            vae_state["max_len"] = ck.get("max_len", 120)
+            log.info(f"VAE loaded from {vae_ckpt}")
+        except Exception as exc:
+            log.warning(f"VAE load failed: {exc}")
+    else:
+        log.info("No VAE checkpoint found; /generate endpoint inactive.")
+
     yield
     ml_models.clear()
+    vae_state.clear()
 
 
 # ── App Setup ─────────────────────────────────────────────────────────────────
+
+ROOT = Path(__file__).resolve().parent.parent.parent.parent
 
 app = FastAPI(
     title="Molecular Property Prediction API",
     description=(
         "Production-grade REST API for predicting molecular properties from SMILES strings. "
-        "Supports single and batch predictions, chemical standardization, and "
-        "GNNExplainer-based atom-level interpretability."
+        "Supports single and batch predictions, chemical standardization, GNNExplainer interpretability, "
+        "KNN structural search, and generative molecular design via SMILES VAE."
     ),
-    version="1.0.0",
+    version="2.0.0",
     lifespan=lifespan,
 )
 
@@ -308,6 +339,76 @@ async def predict_batch(req: BatchPredictRequest):
         results.append(result)
 
     return results
+
+
+# ── Generative Design Endpoint ────────────────────────────────────────────────
+
+
+class GenerateRequest(BaseModel):
+    n: int = Field(5, ge=1, le=20, description="Number of molecules to generate")
+    temperature: float = Field(
+        0.8, ge=0.1, le=2.0, description="Sampling temperature (lower = more conservative)"
+    )
+    seed: Optional[int] = Field(None, description="Random seed for reproducibility")
+
+
+class GeneratedMolecule(BaseModel):
+    smiles: str
+    standardized_smiles: Optional[str] = None
+    valid: bool
+    index: int
+
+
+@app.post("/generate", response_model=list[GeneratedMolecule], tags=["Generative Design"])
+async def generate_molecules(req: GenerateRequest):
+    """
+    Generate novel SMILES strings by sampling from the VAE latent space.
+
+    Samples `n` latent vectors from N(0, I), decodes them to SMILES token
+    sequences, and standardises the output with RDKit.
+    """
+    if not vae_state.get("model"):
+        raise HTTPException(
+            status_code=503,
+            detail="VAE model not loaded. Train with `python scripts/train_vae.py` first.",
+        )
+
+    vae: SMILESVAE = vae_state["model"]
+    vocab: SmilesVocab = vae_state["vocab"]
+    max_len: int = vae_state["max_len"]
+
+    if req.seed is not None:
+        torch.manual_seed(req.seed)
+
+    with torch.no_grad():
+        z = torch.randn(req.n, vae.latent_dim)
+        logits = vae.decode(z, max_len=max_len, temperature=req.temperature)
+        token_ids = logits.argmax(dim=-1).cpu().tolist()
+
+    results = []
+    for i, ids in enumerate(token_ids):
+        raw_smi = vocab.decode(ids)
+        std_smi = standardize_smiles(raw_smi) if raw_smi else None
+        results.append(
+            GeneratedMolecule(
+                smiles=raw_smi,
+                standardized_smiles=std_smi,
+                valid=bool(std_smi),
+                index=i,
+            )
+        )
+
+    return results
+
+
+@app.get("/generate/status", tags=["Generative Design"])
+async def generate_status():
+    """Check whether the VAE generator is loaded and ready."""
+    return {
+        "vae_loaded": bool(vae_state.get("model")),
+        "latent_dim": vae_state["model"].latent_dim if vae_state.get("model") else None,
+        "vocab_size": len(vae_state["vocab"]) if vae_state.get("vocab") else None,
+    }
 
 
 # Mount static files at the root (ensure this is after all other routes)

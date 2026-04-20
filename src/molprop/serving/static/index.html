@@ -3,75 +3,160 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Molecular Explorer Interface</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <meta name="description" content="Molecular Explorer — predict, search, and generate drug-like molecules with GNNs and a Variational Autoencoder.">
+    <title>Molecular Explorer | GNN + VAE Platform</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
     <div class="app-container">
+
+        <!-- ── Header ─────────────────────────────────────────────────────── -->
         <header class="glass-panel text-center">
-            <h1>🧬 Molecular Explorer</h1>
-            <p id="app-title">Connecting to API...</p>
+            <div class="header-inner">
+                <h1>🧬 Molecular Explorer</h1>
+                <p id="app-title">Connecting to API…</p>
+                <div id="api-badges" class="badge-row hidden">
+                    <span class="badge badge-green" id="badge-model">GNN Ready</span>
+                    <span class="badge badge-purple" id="badge-vae">VAE Ready</span>
+                </div>
+            </div>
         </header>
 
+        <!-- ── Tab Navigation ─────────────────────────────────────────────── -->
+        <nav class="tab-nav glass-panel">
+            <button class="tab-btn active" data-tab="predict">
+                <span class="tab-icon">⚡</span> Predict
+            </button>
+            <button class="tab-btn" data-tab="generate">
+                <span class="tab-icon">✨</span> Generate
+            </button>
+        </nav>
+
         <main>
-            <section class="input-section glass-panel fade-in slide-up">
-                <h2>Generate Prediction</h2>
-                <div class="input-group flex-wrap">
-                    <input type="text" id="smiles-input" placeholder="Enter SMILES string (e.g., CC(=O)OC1=CC=CC=C1C(=O)O)" autocomplete="off">
-                    <button id="predict-btn">Predict →</button>
+            <!-- ══════════════════════════════════════════════════════════════
+                 TAB 1 – PREDICT
+            ══════════════════════════════════════════════════════════════ -->
+            <section id="tab-predict" class="tab-panel active">
+
+                <div class="input-section glass-panel fade-in slide-up">
+                    <h2>Predict Molecular Properties</h2>
+                    <p class="section-desc">Enter any SMILES string to get a property prediction, atom-level structural explanation, and the 5 nearest chemical neighbors.</p>
+                    <div class="input-group">
+                        <input type="text" id="smiles-input"
+                               placeholder="e.g. CC(=O)Oc1ccccc1C(=O)O  (Aspirin)"
+                               autocomplete="off" spellcheck="false">
+                        <button id="predict-btn" class="btn-primary">Predict →</button>
+                    </div>
+                    <div class="options-row">
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="explain-cb" checked>
+                            <span class="slider"></span>
+                            <span class="label-text">Structural Explanation (GNNExplainer)</span>
+                        </label>
+                        <label class="uncertainty-label">
+                            MC Dropout samples:
+                            <input type="number" id="uncertainty-input" value="10" min="0" max="50">
+                        </label>
+                    </div>
+                    <div id="predict-loading" class="spinner hidden"></div>
                 </div>
-                <div class="options">
-                    <label class="toggle-switch">
-                        <input type="checkbox" id="explain-cb" checked>
-                        <span class="slider"></span>
-                        <span class="label-text">Structural Explanation (GNNExplainer)</span>
-                    </label>
-                    <label class="uncertainty-label">
-                        Uncertainty Samples (MC Dropout):
-                        <input type="number" id="uncertainty-input" value="10" min="0" max="50">
-                    </label>
-                </div>
-                <div id="loading" class="spinner hidden"></div>
+
+                <section class="results-section hidden" id="results-panel">
+
+                    <!-- Metrics card -->
+                    <div class="result-card glass-panel slide-up">
+                        <h3 class="section-title">Inference Results</h3>
+                        <div class="metrics">
+                            <div class="metric highlight-metric">
+                                <span class="label" id="task-label">Predicted Value</span>
+                                <span class="value" id="pred-value">—</span>
+                            </div>
+                            <div class="metric">
+                                <span class="label">Epistemic Uncertainty (MC Dropout σ)</span>
+                                <span class="value" id="pred-uncertainty">—</span>
+                            </div>
+                            <div class="metric">
+                                <span class="label">Standardised SMILES</span>
+                                <span class="value std-smiles" id="std-smiles-display">—</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Structural Evidence -->
+                    <div class="explanation-card glass-panel hidden slide-up" id="explanation-panel">
+                        <h3 class="section-title">Structural Evidence (GNNExplainer)</h3>
+                        <p class="subtitle">Highlighted atoms contribute most strongly to the prediction via learned message passing.</p>
+                        <div id="svg-container"></div>
+                    </div>
+
+                    <!-- Vector Search Analogs -->
+                    <div id="similarity-panel" class="similarity-card glass-panel hidden slide-up">
+                        <h3 class="section-title">🔍 Structural Analogs (Vector Search)</h3>
+                        <p class="subtitle">Top-5 nearest neighbours found by KNN search in the GNN embedding space.</p>
+                        <div id="analogs-container" class="analogs-grid"></div>
+                    </div>
+
+                </section>
             </section>
 
-            <section class="results-section hidden" id="results-panel">
-                <div class="result-card glass-panel flex-col slide-up">
-                    <h3 class="section-title">Inference Results</h3>
-                    <div class="metrics">
-                        <div class="metric highlight-metric">
-                            <span class="label" id="task-label">Predicted Value</span>
-                            <span class="value" id="pred-value">-</span>
+            <!-- ══════════════════════════════════════════════════════════════
+                 TAB 2 – GENERATE
+            ══════════════════════════════════════════════════════════════ -->
+            <section id="tab-generate" class="tab-panel hidden">
+
+                <div class="input-section glass-panel fade-in slide-up">
+                    <h2>✨ Generative Molecular Design</h2>
+                    <p class="section-desc">
+                        The trained SMILES VAE samples novel chemical structures by exploring the learned latent space.
+                        Lower temperature produces more conservative, drug-like molecules; higher values yield more diverse novelty.
+                    </p>
+                    <div id="vae-status-banner" class="status-banner status-loading">
+                        Checking VAE status…
+                    </div>
+
+                    <div class="gen-controls">
+                        <div class="control-group">
+                            <label for="gen-n">Molecules to generate</label>
+                            <input type="number" id="gen-n" value="8" min="1" max="20">
                         </div>
-                        <div class="metric">
-                            <span class="label">Aleatoric/Epistemic Uncertainty</span>
-                            <span class="value" id="pred-uncertainty">-</span>
+                        <div class="control-group">
+                            <label for="gen-temperature">Temperature
+                                <span class="hint">(0.1 conservative → 2.0 creative)</span>
+                            </label>
+                            <input type="range" id="gen-temperature" min="0.1" max="2.0" step="0.05" value="0.8"
+                                   oninput="document.getElementById('temp-display').textContent=this.value">
+                            <span id="temp-display" class="temp-val">0.80</span>
+                        </div>
+                        <div class="control-group">
+                            <label for="gen-seed">Random seed <span class="hint">(optional)</span></label>
+                            <input type="number" id="gen-seed" placeholder="e.g. 42" min="0">
                         </div>
                     </div>
+
+                    <button id="generate-btn" class="btn-primary btn-generate" disabled>
+                        ✨ Generate Molecules
+                    </button>
+                    <div id="gen-loading" class="spinner hidden"></div>
                 </div>
 
-                <div class="explanation-card glass-panel hidden slide-up" id="explanation-panel">
-                    <h3 class="section-title">Structural Evidence</h3>
-                    <p class="subtitle">Atoms highlighted contribute positively to the prediction via message passing.</p>
-                    <div id="svg-container"></div>
-                </div>
-
-                <!-- Molecular Similarity Search Panel -->
-                <div id="similarity-panel" class="similarity-card glass-panel hidden slide-up">
-                    <h3 class="section-title">Structural Analogs (Vector Search)</h3>
-                    <p class="subtitle">Identified via KNN search in the GNN embedding space.</p>
-                    <div id="analogs-container" class="analogs-grid">
-                        <!-- Analogs will be injected here -->
+                <!-- Generated molecules output -->
+                <section id="gen-results-panel" class="hidden">
+                    <div class="gen-header glass-panel slide-up">
+                        <h3 class="section-title">🧪 Generated Structures</h3>
+                        <div id="gen-stats" class="gen-stats"></div>
                     </div>
-                </div>
+                    <div id="gen-grid" class="generated-grid"></div>
+                </section>
+
             </section>
         </main>
-        
+
         <footer>
-            <p>Powered by PyTorch Geometric & FastAPI • Developed for the MLOps Project Portfolio</p>
+            <p>PyTorch Geometric · FastAPI · SMILES VAE · Qdrant Vector Search · MLOps Portfolio</p>
         </footer>
     </div>
-    
+
     <script src="main.js"></script>
 </body>
 </html>

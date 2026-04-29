@@ -1,8 +1,8 @@
 from typing import List, Optional
 
 import numpy as np
-from rdkit import Chem
-from rdkit.Chem import AllChem
+from rdkit import Chem, DataStructs
+from rdkit.Chem import AllChem, MACCSkeys
 
 
 def smiles_to_morgan(
@@ -54,5 +54,34 @@ def batch_smiles_to_morgan(
             # If a SMILES is invalid here, it's a critical error because
             # it should have been caught in the preprocessing step.
             raise ValueError(f"Invalid SMILES encountered in featurization: {s}")
+        fps.append(fp)
+    return np.stack(fps)
+
+
+def smiles_to_maccs(smiles: str) -> Optional[np.ndarray]:
+    """
+    Convert a SMILES string to a 167-bit MACCS keys fingerprint.
+
+    MACCS keys encode the presence or absence of 166 defined structural
+    fragments and are widely used in virtual screening and SAR analysis.
+    """
+    mol = Chem.MolFromSmiles(smiles)
+    if mol is None:
+        return None
+    fp = MACCSkeys.GenMACCSKeys(mol)
+    arr = np.zeros((167,), dtype=np.int8)
+    DataStructs.ConvertToNumpyArray(fp, arr)
+    return arr
+
+
+def batch_smiles_to_maccs(smiles_list: List[str]) -> np.ndarray:
+    """
+    Convert a list of SMILES to a matrix of MACCS keys fingerprints.
+    """
+    fps = []
+    for s in smiles_list:
+        fp = smiles_to_maccs(s)
+        if fp is None:
+            raise ValueError(f"Invalid SMILES encountered in MACCS featurization: {s}")
         fps.append(fp)
     return np.stack(fps)

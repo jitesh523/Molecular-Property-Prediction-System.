@@ -17,7 +17,10 @@ from sklearn.calibration import calibration_curve
 from sklearn.metrics import (
     PrecisionRecallDisplay,
     RocCurveDisplay,
+    accuracy_score,
     average_precision_score,
+    f1_score,
+    matthews_corrcoef,
     mean_absolute_error,
     mean_squared_error,
     r2_score,
@@ -25,6 +28,47 @@ from sklearn.metrics import (
 )
 
 log = logging.getLogger(__name__)
+
+
+def compute_metrics(
+    y_true: np.ndarray,
+    y_score: np.ndarray,
+    task: str = "classification",
+    threshold: float = 0.5,
+) -> dict:
+    """
+    Compute a comprehensive dict of evaluation metrics.
+
+    Args:
+        y_true: Ground-truth labels or values.
+        y_score: Model output scores (probabilities for classification, raw values for regression).
+        task: ``'classification'`` or ``'regression'``.
+        threshold: Decision threshold for binary classification metrics.
+
+    Returns:
+        Dictionary mapping metric name to float value.
+    """
+    metrics: dict = {}
+
+    if task == "classification":
+        y_pred = (y_score >= threshold).astype(int)
+        metrics["roc_auc"] = round(float(roc_auc_score(y_true, y_score)), 4)
+        metrics["avg_precision"] = round(float(average_precision_score(y_true, y_score)), 4)
+        metrics["accuracy"] = round(float(accuracy_score(y_true, y_pred)), 4)
+        metrics["f1"] = round(float(f1_score(y_true, y_pred, zero_division=0)), 4)
+        metrics["mcc"] = round(float(matthews_corrcoef(y_true, y_pred)), 4)
+    elif task == "regression":
+        metrics["rmse"] = round(float(np.sqrt(mean_squared_error(y_true, y_score))), 4)
+        metrics["mae"] = round(float(mean_absolute_error(y_true, y_score)), 4)
+        metrics["r2"] = round(float(r2_score(y_true, y_score)), 4)
+        residuals = y_true - y_score
+        metrics["mean_error"] = round(float(residuals.mean()), 4)
+        metrics["std_error"] = round(float(residuals.std()), 4)
+    else:
+        raise ValueError(f"Unknown task type: {task!r}. Use 'classification' or 'regression'.")
+
+    return metrics
+
 
 # Styling
 plt.rcParams.update(

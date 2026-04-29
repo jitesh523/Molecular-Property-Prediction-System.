@@ -57,16 +57,24 @@ class MPNNModel(GNNBase):
         for _ in range(self.num_layers - 1):
             self.layers.append(MPNNLayer(self.hidden_dim, self.hidden_dim, self.edge_dim))
 
-    def forward(self, data):
+    def forward(self, data, mc_dropout: bool = False):
         x, edge_index, edge_attr, batch = data.x, data.edge_index, data.edge_attr, data.batch
+        is_training = self.training or mc_dropout
 
         # Message Passing with Edge Features
         for layer in self.layers:
             x = layer(x, edge_index, edge_attr)
-            x = F.dropout(x, p=self.dropout, training=self.training)
+            x = F.dropout(x, p=self.dropout, training=is_training)
 
         # Global Readout
         x = self.pooling(x, batch)
 
         # Prediction Head
         return self.mlp(x)
+
+    @torch.no_grad()
+    def encode(self, data):
+        x, edge_index, edge_attr, batch = data.x, data.edge_index, data.edge_attr, data.batch
+        for layer in self.layers:
+            x = layer(x, edge_index, edge_attr)
+        return self.pooling(x, batch)

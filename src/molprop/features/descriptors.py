@@ -2,7 +2,7 @@ from typing import List, Optional
 
 import numpy as np
 from rdkit import Chem
-from rdkit.Chem import Descriptors
+from rdkit.Chem import Descriptors, rdMolDescriptors
 
 
 def smiles_to_descriptors(smiles: str) -> Optional[np.ndarray]:
@@ -13,7 +13,7 @@ def smiles_to_descriptors(smiles: str) -> Optional[np.ndarray]:
     if mol is None:
         return None
 
-    # Common set of descriptors
+    # Common set of ADMET / Lipinski descriptors
     desc_vals = [
         Descriptors.MolLogP(mol),
         Descriptors.MolWt(mol),
@@ -24,6 +24,16 @@ def smiles_to_descriptors(smiles: str) -> Optional[np.ndarray]:
         Descriptors.MaxAbsPartialCharge(mol),
         Descriptors.MinAbsPartialCharge(mol),
         Descriptors.HeavyAtomCount(mol),
+        # Extended Lipinski / drug-likeness
+        rdMolDescriptors.CalcNumRings(mol),
+        rdMolDescriptors.CalcNumAromaticRings(mol),
+        rdMolDescriptors.CalcFractionCSP3(mol),
+        Descriptors.BertzCT(mol),
+        Descriptors.MolMR(mol),
+        rdMolDescriptors.CalcNumStereocenters(mol),
+        Descriptors.NHOHCount(mol),
+        Descriptors.NOCount(mol),
+        Descriptors.NumValenceElectrons(mol),
     ]
 
     return np.array(desc_vals, dtype=np.float32)
@@ -56,4 +66,13 @@ def get_descriptor_names() -> List[str]:
         "MaxAbsPartialCharge",
         "MinAbsPartialCharge",
         "HeavyAtomCount",
+        "NumRings",
+        "NumAromaticRings",
+        "FractionCSP3",
+        "BertzCT",
+        "MolMR",
+        "NumStereocenters",
+        "NHOHCount",
+        "NOCount",
+        "NumValenceElectrons",
     ]

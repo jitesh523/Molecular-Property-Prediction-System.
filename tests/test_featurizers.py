@@ -10,7 +10,9 @@ from molprop.features.descriptors import (
     smiles_to_descriptors,
 )
 from molprop.features.fingerprints import (
+    batch_smiles_to_maccs,
     batch_smiles_to_morgan,
+    smiles_to_maccs,
     smiles_to_morgan,
 )
 from molprop.features.graphs import smiles_to_graph
@@ -50,6 +52,30 @@ class TestMorganFingerprints:
         assert fp.shape == (1024,)
 
 
+class TestMACCSFingerprints:
+    def test_valid_smiles_shape(self):
+        fp = smiles_to_maccs(VALID_SMILES)
+        assert fp is not None
+        assert fp.shape == (167,)
+
+    def test_binary_values(self):
+        fp = smiles_to_maccs(VALID_SMILES)
+        assert set(np.unique(fp)).issubset({0, 1})
+
+    def test_invalid_smiles_returns_none(self):
+        fp = smiles_to_maccs(INVALID_SMILES)
+        assert fp is None
+
+    def test_different_molecules_differ(self):
+        fp1 = smiles_to_maccs("c1ccccc1")
+        fp2 = smiles_to_maccs(ASPIRIN)
+        assert not np.array_equal(fp1, fp2)
+
+    def test_batch_conversion(self):
+        batch_fp = batch_smiles_to_maccs([VALID_SMILES, ASPIRIN])
+        assert batch_fp.shape == (2, 167)
+
+
 class TestDescriptors:
     def test_valid_smiles(self):
         desc = smiles_to_descriptors(VALID_SMILES)
@@ -58,10 +84,11 @@ class TestDescriptors:
         assert desc.dtype == np.float32
 
     def test_descriptor_count(self):
-        """Should return exactly the number of descriptors we define."""
+        """Should return exactly 18 descriptors."""
         desc = smiles_to_descriptors(VALID_SMILES)
         names = get_descriptor_names()
         assert len(desc) == len(names)
+        assert len(names) == 18
 
     def test_no_nan_for_valid_smiles(self):
         desc = smiles_to_descriptors(VALID_SMILES)

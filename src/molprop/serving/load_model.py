@@ -1,7 +1,7 @@
 """
 Model loading utilities for the inference API.
 
-Supports loading GNN models (GCN, GAT, MPNN) from saved state dicts
+Supports loading GNN models (GCN, GAT, MPNN, GIN) from saved state dicts
 and baseline models (RF, XGBoost) from joblib artifacts.
 """
 
@@ -12,6 +12,7 @@ import torch
 
 from molprop.models.gnn_gat import GATModel
 from molprop.models.gnn_gcn import GCNModel
+from molprop.models.gnn_gin import GINModel
 from molprop.models.gnn_mpnn import MPNNModel
 
 log = logging.getLogger(__name__)
@@ -47,6 +48,15 @@ DEFAULT_GNN_CONFIGS = {
             "edge_dim": 4,
         },
     },
+    "gin": {
+        "cls": GINModel,
+        "kwargs": {
+            "hidden_dim": 128,
+            "out_dim": 1,
+            "num_layers": 4,
+            "dropout": 0.2,
+        },
+    },
 }
 
 
@@ -65,7 +75,7 @@ def load_gnn_model(
     Loads a predefined GNN model architecture and its weights.
 
     Args:
-        model_type: One of 'gcn', 'gat', 'mpnn'.
+        model_type: One of 'gcn', 'gat', 'mpnn', 'gin'.
         weights_path: Path to the saved state dict.
         in_dim: Input node feature dimension.
         hidden_dim: Hidden layer dimension.
@@ -102,6 +112,14 @@ def load_gnn_model(
             num_layers=num_layers,
             dropout=dropout,
             edge_dim=edge_dim,
+        )
+    elif model_type == "gin":
+        model = GINModel(
+            in_dim=in_dim,
+            hidden_dim=hidden_dim,
+            out_dim=out_dim,
+            num_layers=num_layers,
+            dropout=dropout,
         )
     else:
         raise ValueError(f"Unknown model_type: {model_type}")

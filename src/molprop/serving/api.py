@@ -21,6 +21,8 @@ from pydantic import BaseModel, Field
 
 from molprop.data.smiles_vocab import SmilesVocab
 from molprop.data.standardize import standardize_smiles
+from molprop.features.descriptors import get_descriptor_names, smiles_to_descriptors
+from molprop.features.fingerprints import smiles_to_maccs
 from molprop.features.graphs import smiles_to_graph
 from molprop.models.explain import explain_graph, get_explainer
 from molprop.models.vae import SMILESVAE
@@ -29,6 +31,8 @@ from molprop.serving.load_model import load_gnn_model
 from molprop.serving.vector_db import vector_store
 
 log = logging.getLogger(__name__)
+
+ROOT = Path(__file__).resolve().parent.parent.parent.parent
 
 # Global state for loaded model + VAE
 ml_models = {}
@@ -121,8 +125,6 @@ async def lifespan(app: FastAPI):
 
 
 # ── App Setup ─────────────────────────────────────────────────────────────────
-
-ROOT = Path(__file__).resolve().parent.parent.parent.parent
 
 app = FastAPI(
     title="Molecular Property Prediction API",
@@ -409,6 +411,59 @@ async def generate_status():
         "latent_dim": vae_state["model"].latent_dim if vae_state.get("model") else None,
         "vocab_size": len(vae_state["vocab"]) if vae_state.get("vocab") else None,
     }
+
+
+# ── Descriptors Endpoint ──────────────────────────────────────────────────────
+
+
+class DescriptorRequest(BaseModel):
+    smiles: str = Field(..., max_length=MAX_SMILES_LEN, description="SMILES string")
+    include_fingerprint: bool = Field(
+        False, description="Include 167-bit MACCS keys fingerprint in response"
+    )
+
+
+class DescriptorResponse(BaseModel):
+    smiles: str
+    standardized_smiles: Optional[str] = None
+    descriptors: Optional[dict[str, float]] = None
+    maccs_fingerprint: Optional[list[int]] = None
+    error: Optional[str] = None
+
+
+@app.post("/descriptors", response_model=DescriptorResponse, tags=["Cheminformatics"])
+async def compute_descriptors(req: DescriptorRequest):
+    """
+    Compute physicochemical descriptors (and optionally MACCS keys) for a SMILES.
+
+    Returns 18 ADMET/Lipinski-relevant descriptors including LogP, MW, TPSA,
+    H-bond donors/acceptors, ring counts, FractionCSP3, BertzCT, and more.
+    """
+    std_smiles = standardize_smiles(req.smiles)
+    if not std_smiles:
+        return DescriptorResponse(smiles=req.smiles, error="Invalid SMILES string.")
+
+    desc_arr = smiles_to_descriptors(std_smiles)
+    if desc_arr is None:
+        return DescriptorResponse(
+            smiles=req.smiles,
+            standardized_smiles=std_smiles,
+            error="Failed to compute descriptors.",
+        )
+
+    desc_dict = dict(zip(get_descriptor_names(), desc_arr.tolist()))
+
+    maccs = None
+    if req.include_fingerprint:
+        fp = smiles_to_maccs(std_smiles)
+        maccs = fp.tolist() if fp is not None else None
+
+    return DescriptorResponse(
+        smiles=req.smiles,
+        standardized_smiles=std_smiles,
+        descriptors=desc_dict,
+        maccs_fingerprint=maccs,
+    )
 
 
 # Mount static files at the root (ensure this is after all other routes)

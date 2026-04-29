@@ -7,6 +7,7 @@ import numpy as np
 import pandas as pd
 from rdkit import Chem
 from rdkit.Chem.Scaffolds import MurckoScaffold
+from sklearn.model_selection import StratifiedShuffleSplit
 
 log = logging.getLogger(__name__)
 
@@ -143,6 +144,55 @@ def scaffold_kfold(
         splits.append((train_inds, val_inds))
 
     return splits
+
+
+def stratified_split(
+    labels: List[int],
+    frac_train: float = 0.8,
+    frac_val: float = 0.1,
+    frac_test: float = 0.1,
+    seed: int = 42,
+) -> Tuple[List[int], List[int], List[int]]:
+    """
+    Stratified random split that preserves class balance across train/val/test.
+
+    Useful for imbalanced classification datasets (e.g., BBBP, HIV) where
+    random splitting can lead to skewed label distributions in small sets.
+
+    Args:
+        labels: Integer class labels for each molecule.
+        frac_train: Fraction of data for training.
+        frac_val: Fraction of data for validation.
+        frac_test: Fraction of data for testing.
+        seed: Random seed for reproducibility.
+
+    Returns:
+        Tuple of (train_indices, val_indices, test_indices).
+    """
+    np.testing.assert_almost_equal(frac_train + frac_val + frac_test, 1.0)
+
+    labels_arr = np.array(labels)
+    all_indices = np.arange(len(labels_arr))
+
+    # First split: hold out test set
+    test_frac = frac_test
+    sss_test = StratifiedShuffleSplit(n_splits=1, test_size=test_frac, random_state=seed)
+    train_val_idx, test_idx = next(sss_test.split(all_indices, labels_arr))
+
+    # Second split: split remaining into train and val
+    val_frac_of_remaining = frac_val / (frac_train + frac_val)
+    sss_val = StratifiedShuffleSplit(
+        n_splits=1, test_size=val_frac_of_remaining, random_state=seed
+    )
+    train_idx, val_idx = next(
+        sss_val.split(train_val_idx, labels_arr[train_val_idx])
+    )
+
+    return (
+        train_val_idx[train_idx].tolist(),
+        train_val_idx[val_idx].tolist(),
+        test_idx.tolist(),
+    )
 
 
 def temporal_split(

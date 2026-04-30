@@ -1,6 +1,8 @@
 import logging
-from typing import Dict, Literal
+from pathlib import Path
+from typing import Dict, List, Literal
 
+import joblib
 import numpy as np
 from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 from sklearn.metrics import (
@@ -11,6 +13,7 @@ from sklearn.metrics import (
     r2_score,
     roc_auc_score,
 )
+from sklearn.model_selection import StratifiedKFold, KFold
 from xgboost import XGBClassifier, XGBRegressor
 
 log = logging.getLogger(__name__)
@@ -88,3 +91,77 @@ class BaselineModel:
             metrics["mcc"] = float(matthews_corrcoef(y_true, y_pred))
 
         return metrics
+
+    def save(self, path: str) -> None:
+        """
+        Serialize the fitted model to disk using joblib.
+
+        Args:
+            path: File path ending in '.joblib' or '.pkl'.
+        """
+        out = Path(path)
+        out.parent.mkdir(parents=True, exist_ok=True)
+        joblib.dump(self.model, out)
+        log.info(f"Saved {self.model_type} model to {out}")
+
+    @classmethod
+    def load(cls, path: str, model_type: str, task_type: TaskType) -> "BaselineModel":
+        """
+        Restore a previously saved BaselineModel from disk.
+
+        Args:
+            path: Path to the joblib artifact.
+            model_type: 'rf' or 'xgb' (used for metadata only).
+            task_type: 'regression' or 'classification'.
+
+        Returns:
+            A BaselineModel instance with the deserialized model.
+        """
+        obj = cls.__new__(cls)
+        obj.model_type = model_type
+        obj.task_type = task_type
+        obj.params = {}
+        obj.model = joblib.load(Path(path))
+        log.info(f"Loaded {model_type} model from {path}")
+        return obj
+
+    def cross_validate(
+        self,
+        x: np.ndarray,
+        y: np.ndarray,
+        n_folds: int = 5,
+        seed: int = 42,
+    ) -> Dict[str, List[float]]:
+        """
+        Run stratified k-fold (classification) or k-fold (regression) CV.
+
+        Args:
+            x: Feature matrix of shape (n_samples, n_features).
+            y: Target array of shape (n_samples,).
+            n_folds: Number of CV folds.
+            seed: Random seed for reproducibility.
+
+        Returns:
+            Dict mapping metric name → list of per-fold scores.
+        """
+        if self.task_type == "classification":
+            splitter = StratifiedKFold(n_splits=n_folds, shuffle=True, random_state=seed)
+        else:
+            splitter = KFold(n_splits=n_folds, shuffle=True, random_state=seed)
+
+        fold_metrics: Dict[str, List[float]] = {}
+        for fold_idx, (train_idx, val_idx) in enumerate(splitter.split(x, y)):
+            x_tr, x_val = x[train_idx], x[val_idx]
+            y_tr, y_val = y[train_idx], y[val_idx]
+
+            # Reinitialize to avoid state bleed between folds
+            fold_model = self.__class__(self.model_type, self.task_type, self.params)
+            fold_model.train(x_tr, y_tr)
+            metrics = fold_model.evaluate(x_val, y_val)
+
+            for k, v in metrics.items():
+                fold_metrics.setdefault(k, []).append(v)
+
+            log.info(f"  Fold {fold_idx + 1}/{n_folds}: {metrics}")
+
+        return fold_metrics

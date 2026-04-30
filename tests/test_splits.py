@@ -5,7 +5,9 @@ Tests for scaffold splitting: integrity, no leakage, determinism, coverage.
 from molprop.data.splits import (
     generate_scaffold,
     random_scaffold_split,
+    scaffold_kfold,
     scaffold_split,
+    stratified_split,
 )
 
 # Diverse SMILES that produce different Bemis-Murcko scaffolds
@@ -125,3 +127,65 @@ class TestRandomScaffoldSplit:
         split2 = random_scaffold_split(SAMPLE_SMILES, seed=999)
         # At least one of train/val/test should differ
         assert split1 != split2
+
+
+class TestStratifiedSplit:
+    LABELS = [0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1]
+
+    def test_no_index_overlap(self):
+        train, val, test = stratified_split(self.LABELS)
+        assert len(set(train) & set(val)) == 0
+        assert len(set(train) & set(test)) == 0
+        assert len(set(val) & set(test)) == 0
+
+    def test_full_coverage(self):
+        train, val, test = stratified_split(self.LABELS)
+        all_indices = sorted(train + val + test)
+        assert all_indices == list(range(len(self.LABELS)))
+
+    def test_class_balance_train(self):
+        """Training set should have roughly equal class ratio."""
+        train, val, test = stratified_split(self.LABELS)
+        train_labels = [self.LABELS[i] for i in train]
+        ratio = sum(train_labels) / len(train_labels)
+        assert 0.3 <= ratio <= 0.7
+
+    def test_class_balance_test(self):
+        """Test set should have roughly equal class ratio."""
+        train, val, test = stratified_split(self.LABELS)
+        test_labels = [self.LABELS[i] for i in test]
+        ratio = sum(test_labels) / len(test_labels)
+        assert 0.3 <= ratio <= 0.7
+
+    def test_determinism(self):
+        split1 = stratified_split(self.LABELS, seed=42)
+        split2 = stratified_split(self.LABELS, seed=42)
+        assert split1 == split2
+
+
+class TestScaffoldKFold:
+    def test_correct_fold_count(self):
+        splits = scaffold_kfold(SAMPLE_SMILES, n_folds=5)
+        assert len(splits) == 5
+
+    def test_each_fold_is_tuple(self):
+        splits = scaffold_kfold(SAMPLE_SMILES, n_folds=3)
+        for train_idx, val_idx in splits:
+            assert isinstance(train_idx, list)
+            assert isinstance(val_idx, list)
+
+    def test_no_overlap_within_fold(self):
+        splits = scaffold_kfold(SAMPLE_SMILES, n_folds=5)
+        for train_idx, val_idx in splits:
+            assert len(set(train_idx) & set(val_idx)) == 0
+
+    def test_full_coverage_across_folds(self):
+        """Union of all val sets must cover every molecule exactly once."""
+        splits = scaffold_kfold(SAMPLE_SMILES, n_folds=5)
+        all_val = [i for _, val in splits for i in val]
+        assert sorted(all_val) == list(range(len(SAMPLE_SMILES)))
+
+    def test_determinism(self):
+        s1 = scaffold_kfold(SAMPLE_SMILES, n_folds=3, seed=42)
+        s2 = scaffold_kfold(SAMPLE_SMILES, n_folds=3, seed=42)
+        assert s1 == s2

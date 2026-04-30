@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0] - 2026-04-30
+
+### Added
+- `passes_lipinski_ro5()` in `standardize.py` — returns MW, LogP, HBD, HBA and violation list for oral-bioavailability filtering.
+- `generate_multiple_conformers()` + `get_conformer_rmsd()` in `conformers.py` — ETKDGv3 ensemble generation with RMSD-based pruning and pairwise RMSD diagnostics.
+- `/conformer` REST endpoint — generates and returns an MMFF94-optimized 3D PDB block for any SMILES, ready for py3Dmol visualisation.
+- `/lipinski` REST endpoint — evaluates Lipinski Ro5 for any SMILES via a simple GET request.
+- `save()` / `load()` persistence methods on `BaselineModel` using joblib.
+- `cross_validate()` method on `BaselineModel` — stratified k-fold (classification) or k-fold (regression) CV with per-fold metric logging.
+- GIN backbone option in `MultiTaskGNN` (was previously missing).
+- `scripts/train_gin.py` — dedicated GIN training script with AdamW + cosine-annealing LR, gradient clipping, and full `compute_metrics()` test reporting.
+- Tests for `stratified_split` (coverage, class balance, determinism) and `scaffold_kfold` (fold count, coverage, no-overlap) in `test_splits.py`.
+- Lipinski Ro5 tests in `test_standardize.py`.
+
+### Fixed
+- **Bug**: `recreate_collection()` deprecated in qdrant-client ≥ 1.9 — replaced with idempotent `create_collection()` + `collection_exists()` guard.
+- Added `count()` and `delete_collection()` utility methods to `MolecularVectorStore`.
+
 ## [1.2.0] - 2026-04-29
 
 ### Added

@@ -13,6 +13,7 @@ import torch.nn.functional as F
 
 from molprop.models.gnn_gat import GATModel
 from molprop.models.gnn_gcn import GCNModel
+from molprop.models.gnn_gin import GINModel
 from molprop.models.gnn_mpnn import MPNNModel
 
 
@@ -38,7 +39,7 @@ class MultiTaskGNN(nn.Module):
     ):
         """
         Args:
-            backbone: One of 'gcn', 'gat', 'mpnn'.
+            backbone: One of 'gcn', 'gat', 'mpnn', 'gin'.
             in_dim: Input node feature dimension.
             hidden_dim: Hidden layer dimension in backbone.
             num_tasks: Number of output tasks.
@@ -69,6 +70,8 @@ class MultiTaskGNN(nn.Module):
             self.backbone = GATModel(heads=backbone_kwargs.get("heads", 4), **common)
         elif backbone == "mpnn":
             self.backbone = MPNNModel(edge_dim=backbone_kwargs.get("edge_dim", 3), **common)
+        elif backbone == "gin":
+            self.backbone = GINModel(**common)
         else:
             raise ValueError(f"Unknown backbone: {backbone}")
 

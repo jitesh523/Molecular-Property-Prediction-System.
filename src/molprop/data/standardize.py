@@ -1,8 +1,8 @@
 import logging
-from typing import Optional
+from typing import Dict, Optional
 
 from rdkit import Chem
-from rdkit.Chem import SaltRemover
+from rdkit.Chem import Descriptors, SaltRemover
 from rdkit.Chem.MolStandardize import rdMolStandardize
 
 log = logging.getLogger(__name__)
@@ -57,3 +57,61 @@ def standardize_smiles(smiles: str, keep_chirality: bool = True) -> Optional[str
     except Exception as e:
         log.debug(f"Standardization exception for {smiles}: {e}")
         return None
+
+
+def passes_lipinski_ro5(
+    smiles: str,
+    mw_limit: float = 500.0,
+    logp_limit: float = 5.0,
+    hbd_limit: int = 5,
+    hba_limit: int = 10,
+) -> Optional[Dict[str, object]]:
+    """
+    Check whether a molecule passes Lipinski's Rule of Five.
+
+    The Ro5 is a widely used heuristic for oral bioavailability: a drug
+    candidate is likely orally active if it satisfies *at least 3 of 4*
+    criteria (allowing one violation as per the original paper).
+
+    Args:
+        smiles: Input SMILES string (will be standardized first).
+        mw_limit: Molecular weight upper bound (default 500 Da).
+        logp_limit: LogP upper bound (default 5).
+        hbd_limit: H-bond donor count upper bound (default 5).
+        hba_limit: H-bond acceptor count upper bound (default 10).
+
+    Returns:
+        Dict with keys 'passes' (bool), 'violations' (list[str]),
+        and individual property values, or None if SMILES is invalid.
+    """
+    std = standardize_smiles(smiles)
+    if std is None:
+        return None
+
+    mol = Chem.MolFromSmiles(std)
+    if mol is None:
+        return None
+
+    mw = Descriptors.MolWt(mol)
+    logp = Descriptors.MolLogP(mol)
+    hbd = Descriptors.NumHDonors(mol)
+    hba = Descriptors.NumHAcceptors(mol)
+
+    violations = []
+    if mw > mw_limit:
+        violations.append(f"MW={mw:.1f} > {mw_limit}")
+    if logp > logp_limit:
+        violations.append(f"LogP={logp:.2f} > {logp_limit}")
+    if hbd > hbd_limit:
+        violations.append(f"HBD={hbd} > {hbd_limit}")
+    if hba > hba_limit:
+        violations.append(f"HBA={hba} > {hba_limit}")
+
+    return {
+        "passes": len(violations) <= 1,
+        "violations": violations,
+        "MW": round(mw, 2),
+        "LogP": round(logp, 3),
+        "HBD": hbd,
+        "HBA": hba,
+    }

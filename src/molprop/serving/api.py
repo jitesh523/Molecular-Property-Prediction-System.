@@ -20,7 +20,8 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from molprop.data.smiles_vocab import SmilesVocab
-from molprop.data.standardize import standardize_smiles
+from molprop.data.standardize import passes_lipinski_ro5, standardize_smiles
+from molprop.features.conformers import generate_3d_conformer, mol_to_pdb
 from molprop.features.descriptors import get_descriptor_names, smiles_to_descriptors
 from molprop.features.fingerprints import smiles_to_maccs
 from molprop.features.graphs import smiles_to_graph
@@ -463,6 +464,91 @@ async def compute_descriptors(req: DescriptorRequest):
         standardized_smiles=std_smiles,
         descriptors=desc_dict,
         maccs_fingerprint=maccs,
+    )
+
+
+# ── Conformer Endpoint ────────────────────────────────────────────────────────
+
+
+class ConformerRequest(BaseModel):
+    smiles: str = Field(..., max_length=MAX_SMILES_LEN, description="SMILES string")
+
+
+class ConformerResponse(BaseModel):
+    smiles: str
+    standardized_smiles: Optional[str] = None
+    pdb_block: Optional[str] = None
+    num_atoms: Optional[int] = None
+    error: Optional[str] = None
+
+
+@app.post("/conformer", response_model=ConformerResponse, tags=["Cheminformatics"])
+async def get_conformer(req: ConformerRequest):
+    """
+    Generate a 3D conformer for a SMILES string.
+
+    Uses RDKit ETKDGv3 embedding followed by MMFF94 force-field optimisation.
+    Returns the optimized geometry as a PDB block for downstream 3D visualisation
+    (e.g. with py3Dmol / 3Dmol.js).
+    """
+    std_smiles = standardize_smiles(req.smiles)
+    if not std_smiles:
+        return ConformerResponse(smiles=req.smiles, error="Invalid SMILES string.")
+
+    mol = generate_3d_conformer(std_smiles)
+    if mol is None:
+        return ConformerResponse(
+            smiles=req.smiles,
+            standardized_smiles=std_smiles,
+            error="3D embedding failed for this molecule.",
+        )
+
+    pdb = mol_to_pdb(mol)
+    return ConformerResponse(
+        smiles=req.smiles,
+        standardized_smiles=std_smiles,
+        pdb_block=pdb,
+        num_atoms=mol.GetNumAtoms(),
+    )
+
+
+# ── Lipinski Rule-of-Five Endpoint ────────────────────────────────────────────
+
+
+class LipinskiResponse(BaseModel):
+    smiles: str
+    standardized_smiles: Optional[str] = None
+    passes: Optional[bool] = None
+    violations: Optional[list[str]] = None
+    MW: Optional[float] = None
+    LogP: Optional[float] = None
+    HBD: Optional[int] = None
+    HBA: Optional[int] = None
+    error: Optional[str] = None
+
+
+@app.get("/lipinski", response_model=LipinskiResponse, tags=["Cheminformatics"])
+async def check_lipinski(smiles: str):
+    """
+    Evaluate Lipinski's Rule of Five for a SMILES string.
+
+    Returns individual property values (MW, LogP, HBD, HBA) and a list of
+    violations. A molecule *passes* if it has at most 1 violation.
+    """
+    result = passes_lipinski_ro5(smiles)
+    if result is None:
+        return LipinskiResponse(smiles=smiles, error="Invalid or unparseable SMILES.")
+
+    std = standardize_smiles(smiles)
+    return LipinskiResponse(
+        smiles=smiles,
+        standardized_smiles=std,
+        passes=result["passes"],
+        violations=result["violations"],
+        MW=result["MW"],
+        LogP=result["LogP"],
+        HBD=result["HBD"],
+        HBA=result["HBA"],
     )
 
 

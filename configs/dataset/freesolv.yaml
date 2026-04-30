@@ -1,0 +1,4 @@
+name: "freesolv"
+task_type: "regression"
+target: "expt"
+split_type: "random_scaffold"

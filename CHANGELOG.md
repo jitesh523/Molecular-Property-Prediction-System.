@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.1] - 2026-04-30
+
+### Added
+- `configs/model/gin.yaml` — GIN model config for Hydra CLI (`model=gin` was silently broken).
+- `configs/dataset/freesolv.yaml`, `lipo.yaml`, `tox21.yaml` — three new dataset configs covering hydration free energy, lipophilicity, and 12-assay toxicology.
+- `GET /search` endpoint — standalone GNN embedding-based KNN similarity search in the vector store (returns top-k neighbours with cosine score).
+- GIN backbone support in `scripts/train_gnn.py` (the main generic training script was missing GIN).
+- GIN backbone comment in `configs/model/multitask.yaml`.
+- 10 new API integration tests in `test_inference.py` covering `/descriptors`, `/lipinski`, `/conformer`, `/generate/status`, and `/search`.
+
+### Fixed
+- `benchmarks.yml` CI trigger now includes `scripts/train_gin.py` and `configs/**` path globs so benchmark runs fire on config changes.
+
 ## [1.3.0] - 2026-04-30
 
 ### Added

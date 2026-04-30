@@ -1,0 +1,9 @@
+name: "tox21"
+task_type: "classification"
+target: "SR-ARE"
+split_type: "random_scaffold"
+# Tox21 has 12 assay columns. To train multi-task, use train_multitask.py
+# and override target with a comma-separated list or use the multitask config.
+# Single-task targets: NR-AR, NR-AR-LBD, NR-AhR, NR-Aromatase, NR-ER,
+#                      NR-ER-LBD, NR-PPAR-gamma, SR-ARE, SR-ATAD5,
+#                      SR-HSE, SR-MMP, SR-p53

@@ -1,0 +1,4 @@
+name: "lipo"
+task_type: "regression"
+target: "exp"
+split_type: "random_scaffold"

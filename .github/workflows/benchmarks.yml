@@ -6,7 +6,9 @@ on:
     paths:
       - 'src/molprop/**'
       - 'scripts/train_gnn.py'
+      - 'scripts/train_gin.py'
       - 'scripts/run_baselines.py'
+      - 'configs/**'
   pull_request:
     branches: [ main ]
 

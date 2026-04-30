@@ -13,6 +13,9 @@ dropout: 0.2
 # backbone: "mpnn"
 # edge_dim: 3
 
+# For GIN backbone (most expressive, best for Tox21):
+# backbone: "gin"
+
 # Task types are auto-inferred from data if not set.
 # Override with a list matching your target columns:
 # task_types: ["classification", "regression"]

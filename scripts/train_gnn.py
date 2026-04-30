@@ -16,6 +16,7 @@ from molprop.data.splits import random_scaffold_split
 from molprop.features.graphs import smiles_to_graph
 from molprop.models.gnn_gat import GATModel
 from molprop.models.gnn_gcn import GCNModel
+from molprop.models.gnn_gin import GINModel
 from molprop.models.gnn_mpnn import MPNNModel
 
 logging.basicConfig(level=logging.INFO, format="%(message)s")
@@ -153,6 +154,14 @@ def run_training(cfg: DictConfig):
             num_layers=cfg.model.num_layers,
             dropout=cfg.model.dropout,
             heads=cfg.model.heads,
+        )
+    elif cfg.model.type == "gin":
+        model = GINModel(
+            in_dim=in_dim,
+            hidden_dim=cfg.model.hidden_dim,
+            out_dim=1,
+            num_layers=cfg.model.num_layers,
+            dropout=cfg.model.dropout,
         )
     else:
         model = MPNNModel(

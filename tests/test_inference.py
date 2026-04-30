@@ -81,3 +81,110 @@ def test_response_has_timing_header(client):
     """Verify the timing middleware adds X-Process-Time."""
     response = client.get("/health")
     assert "x-process-time" in response.headers
+
+
+# ── /descriptors ──────────────────────────────────────────────────────────────────────
+
+
+def test_descriptors_valid_smiles(client):
+    """Valid SMILES should return 18 descriptors."""
+    response = client.post("/descriptors", json={"smiles": "c1ccccc1"})
+    assert response.status_code == 200
+    data = response.json()
+    assert data["error"] is None
+    assert len(data["descriptors"]) == 18
+    assert "MolLogP" in data["descriptors"]
+    assert "FractionCSP3" in data["descriptors"]
+
+
+def test_descriptors_with_maccs(client):
+    """include_fingerprint=True should add a 167-element list."""
+    response = client.post(
+        "/descriptors", json={"smiles": "c1ccccc1", "include_fingerprint": True}
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["maccs_fingerprint"] is not None
+    assert len(data["maccs_fingerprint"]) == 167
+
+
+def test_descriptors_invalid_smiles(client):
+    response = client.post("/descriptors", json={"smiles": "NOT_VALID"})
+    assert response.status_code == 200
+    assert response.json()["error"] is not None
+
+
+# ── /lipinski ────────────────────────────────────────────────────────────────────────
+
+
+def test_lipinski_aspirin(client):
+    """Aspirin should pass Ro5 with no violations."""
+    response = client.get("/lipinski", params={"smiles": "CC(=O)OC1=CC=CC=C1C(=O)O"})
+    assert response.status_code == 200
+    data = response.json()
+    assert data["passes"] is True
+    assert data["violations"] == []
+    assert data["MW"] is not None
+    assert data["LogP"] is not None
+
+
+def test_lipinski_invalid_smiles(client):
+    response = client.get("/lipinski", params={"smiles": "NOT_A_MOLECULE"})
+    assert response.status_code == 200
+    assert response.json()["error"] is not None
+
+
+# ── /conformer ────────────────────────────────────────────────────────────────────────
+
+
+def test_conformer_valid_smiles(client):
+    """Valid SMILES should return a non-empty PDB block."""
+    response = client.post("/conformer", json={"smiles": "c1ccccc1"})
+    assert response.status_code == 200
+    data = response.json()
+    assert data["error"] is None
+    assert data["pdb_block"] is not None
+    assert "ATOM" in data["pdb_block"] or "HETATM" in data["pdb_block"]
+    assert data["num_atoms"] is not None and data["num_atoms"] > 0
+
+
+def test_conformer_invalid_smiles(client):
+    response = client.post("/conformer", json={"smiles": "NOT_VALID_XYZ"})
+    assert response.status_code == 200
+    assert response.json()["error"] is not None
+
+
+# ── /generate/status ───────────────────────────────────────────────────────────────
+
+
+def test_generate_status_endpoint(client):
+    """Should return vae_loaded bool and optional latent_dim."""
+    response = client.get("/generate/status")
+    assert response.status_code == 200
+    data = response.json()
+    assert "vae_loaded" in data
+    assert isinstance(data["vae_loaded"], bool)
+
+
+# ── /search ────────────────────────────────────────────────────────────────────────────
+
+
+def test_search_no_model(client):
+    """Returns 503 when no model is loaded."""
+    if ml_models.get("model") is None:
+        response = client.get("/search", params={"smiles": "c1ccccc1"})
+        assert response.status_code == 503
+
+
+def test_search_invalid_topk(client):
+    """top_k out of range should return 400."""
+    if ml_models.get("model") is not None:
+        response = client.get("/search", params={"smiles": "c1ccccc1", "top_k": 999})
+        assert response.status_code == 400
+
+
+def test_search_invalid_smiles(client):
+    """Invalid SMILES should return 400."""
+    if ml_models.get("model") is not None:
+        response = client.get("/search", params={"smiles": "NOT_VALID"})
+        assert response.status_code == 400

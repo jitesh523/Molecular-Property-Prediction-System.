@@ -467,6 +467,46 @@ async def compute_descriptors(req: DescriptorRequest):
     )
 
 
+# ── Similarity Search Endpoint ───────────────────────────────────────────────
+
+
+@app.get("/search", tags=["Cheminformatics"])
+async def similarity_search(smiles: str, top_k: int = 5):
+    """
+    Find the most structurally similar molecules in the indexed database.
+
+    Encodes the query SMILES as a GNN embedding vector and performs cosine
+    KNN search against the Qdrant vector store.
+    Returns up to `top_k` neighbours with their SMILES, score, and task value.
+    """
+    if ml_models.get("model") is None:
+        raise HTTPException(status_code=503, detail="Model not loaded; vector search unavailable.")
+    if top_k < 1 or top_k > 50:
+        raise HTTPException(status_code=400, detail="top_k must be between 1 and 50.")
+
+    std_smiles = standardize_smiles(smiles)
+    if not std_smiles:
+        raise HTTPException(status_code=400, detail="Invalid SMILES string.")
+
+    graph = smiles_to_graph(std_smiles)
+    if graph is None:
+        raise HTTPException(status_code=400, detail="Could not extract features from SMILES.")
+
+    graph.batch = torch.zeros(graph.x.size(0), dtype=torch.long)
+    try:
+        query_vec = ml_models["model"].encode(graph).squeeze(0).cpu().numpy().tolist()
+        results = vector_store.search_similar(query_vec, top_k=top_k)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Similarity search failed: {exc}") from exc
+
+    return {
+        "query_smiles": smiles,
+        "standardized_smiles": std_smiles,
+        "indexed_molecules": vector_store.count(),
+        "results": results,
+    }
+
+
 # ── Conformer Endpoint ────────────────────────────────────────────────────────
 
 

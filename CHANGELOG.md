@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.0] - 2026-05-01
+
+### Added
+- `tanimoto_similarity(smiles1, smiles2)` in `fingerprints.py` — computes Morgan fingerprint-based Tanimoto (Jaccard) similarity between two molecules (ECFP4, 2048 bits); returns `None` for invalid SMILES.
+- `POST /compare` REST endpoint — side-by-side molecule comparison returning physicochemical descriptors, Lipinski Ro5 results, and Tanimoto similarity for two input SMILES; gracefully handles one-sided invalid inputs.
+- `specificity` and `balanced_accuracy` metrics in `compute_metrics()` for classification tasks (derived from confusion matrix via sklearn).
+- `pearson_r` metric in `compute_metrics()` for regression tasks (scipy `pearsonr`).
+- `tests/test_evaluate.py` — 13 new unit tests covering `compute_metrics()` for both classification (perfect classifier, random baseline, threshold sensitivity, specificity, type checks) and regression (perfect regressor, Pearson R range/anticorrelation, RMSE ≥ MAE, type checks) scenarios plus invalid-task error handling.
+- 7 new `TestTanimotoSimilarity` tests in `test_featurizers.py` (identity, range, symmetry, invalid SMILES, dissimilarity).
+- 5 new `/compare` integration tests in `test_inference.py` (valid pair, identical molecules, descriptor count, Lipinski presence, one-sided invalid SMILES).
+
 ## [1.3.1] - 2026-04-30
 
 ### Added

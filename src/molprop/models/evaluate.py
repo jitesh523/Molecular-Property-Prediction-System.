@@ -14,11 +14,14 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 from sklearn.calibration import calibration_curve
+from scipy.stats import pearsonr
 from sklearn.metrics import (
     PrecisionRecallDisplay,
     RocCurveDisplay,
     accuracy_score,
     average_precision_score,
+    balanced_accuracy_score,
+    confusion_matrix,
     f1_score,
     matthews_corrcoef,
     mean_absolute_error,
@@ -57,6 +60,10 @@ def compute_metrics(
         metrics["accuracy"] = round(float(accuracy_score(y_true, y_pred)), 4)
         metrics["f1"] = round(float(f1_score(y_true, y_pred, zero_division=0)), 4)
         metrics["mcc"] = round(float(matthews_corrcoef(y_true, y_pred)), 4)
+        tn, fp_count, fn, tp = confusion_matrix(y_true, y_pred, labels=[0, 1]).ravel()
+        denom = tn + fp_count
+        metrics["specificity"] = round(float(tn / denom) if denom > 0 else 0.0, 4)
+        metrics["balanced_accuracy"] = round(float(balanced_accuracy_score(y_true, y_pred)), 4)
     elif task == "regression":
         metrics["rmse"] = round(float(np.sqrt(mean_squared_error(y_true, y_score))), 4)
         metrics["mae"] = round(float(mean_absolute_error(y_true, y_score)), 4)
@@ -64,6 +71,8 @@ def compute_metrics(
         residuals = y_true - y_score
         metrics["mean_error"] = round(float(residuals.mean()), 4)
         metrics["std_error"] = round(float(residuals.std()), 4)
+        r, _ = pearsonr(y_true, y_score)
+        metrics["pearson_r"] = round(float(r), 4)
     else:
         raise ValueError(f"Unknown task type: {task!r}. Use 'classification' or 'regression'.")
 

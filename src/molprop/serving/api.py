@@ -23,7 +23,7 @@ from molprop.data.smiles_vocab import SmilesVocab
 from molprop.data.standardize import passes_lipinski_ro5, standardize_smiles
 from molprop.features.conformers import generate_3d_conformer, mol_to_pdb
 from molprop.features.descriptors import get_descriptor_names, smiles_to_descriptors
-from molprop.features.fingerprints import smiles_to_maccs
+from molprop.features.fingerprints import smiles_to_maccs, tanimoto_similarity
 from molprop.features.graphs import smiles_to_graph
 from molprop.models.explain import explain_graph, get_explainer
 from molprop.models.vae import SMILESVAE
@@ -590,6 +590,66 @@ async def check_lipinski(smiles: str):
         HBD=result["HBD"],
         HBA=result["HBA"],
     )
+
+
+# ── Molecule Comparison Endpoint ──────────────────────────────────────────────
+
+
+class CompareRequest(BaseModel):
+    smiles_a: str = Field(..., max_length=MAX_SMILES_LEN, description="First SMILES string")
+    smiles_b: str = Field(..., max_length=MAX_SMILES_LEN, description="Second SMILES string")
+
+
+class MoleculeProfile(BaseModel):
+    smiles: str
+    standardized_smiles: Optional[str] = None
+    descriptors: Optional[dict[str, float]] = None
+    lipinski: Optional[dict] = None
+    error: Optional[str] = None
+
+
+class CompareResponse(BaseModel):
+    molecule_a: MoleculeProfile
+    molecule_b: MoleculeProfile
+    tanimoto_similarity: Optional[float] = None
+
+
+def _build_profile(smiles: str) -> MoleculeProfile:
+    """Compute standardized SMILES, descriptors and Lipinski Ro5 for one molecule."""
+    std = standardize_smiles(smiles)
+    if not std:
+        return MoleculeProfile(smiles=smiles, error="Invalid or unparseable SMILES.")
+    desc_arr = smiles_to_descriptors(std)
+    desc_dict = (
+        dict(zip(get_descriptor_names(), desc_arr.tolist())) if desc_arr is not None else None
+    )
+    ro5 = passes_lipinski_ro5(std)
+    return MoleculeProfile(
+        smiles=smiles,
+        standardized_smiles=std,
+        descriptors=desc_dict,
+        lipinski=ro5,
+    )
+
+
+@app.post("/compare", response_model=CompareResponse, tags=["Cheminformatics"])
+async def compare_molecules(req: CompareRequest):
+    """
+    Compare two molecules side-by-side.
+
+    Returns physicochemical descriptors, Lipinski Ro5 evaluation, and Morgan
+    fingerprint-based Tanimoto similarity (ECFP4, 2048 bits) for both SMILES.
+    Tanimoto similarity of 1.0 indicates identical structures; 0.0 indicates no
+    shared substructures in the fingerprint.
+    """
+    profile_a = _build_profile(req.smiles_a)
+    profile_b = _build_profile(req.smiles_b)
+
+    sim = None
+    if profile_a.standardized_smiles and profile_b.standardized_smiles:
+        sim = tanimoto_similarity(profile_a.standardized_smiles, profile_b.standardized_smiles)
+
+    return CompareResponse(molecule_a=profile_a, molecule_b=profile_b, tanimoto_similarity=sim)
 
 
 # Mount static files at the root (ensure this is after all other routes)

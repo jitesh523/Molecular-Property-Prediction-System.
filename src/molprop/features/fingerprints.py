@@ -85,3 +85,25 @@ def batch_smiles_to_maccs(smiles_list: List[str]) -> np.ndarray:
             raise ValueError(f"Invalid SMILES encountered in MACCS featurization: {s}")
         fps.append(fp)
     return np.stack(fps)
+
+
+def tanimoto_similarity(smiles1: str, smiles2: str, radius: int = 2, n_bits: int = 2048) -> Optional[float]:
+    """
+    Compute Tanimoto (Jaccard) similarity between two molecules using Morgan fingerprints.
+
+    Args:
+        smiles1: First SMILES string.
+        smiles2: Second SMILES string.
+        radius: Morgan fingerprint radius (default 2 → ECFP4).
+        n_bits: Fingerprint bit-vector length.
+
+    Returns:
+        Tanimoto similarity in [0, 1], or None if either SMILES is invalid.
+    """
+    mol1 = Chem.MolFromSmiles(smiles1)
+    mol2 = Chem.MolFromSmiles(smiles2)
+    if mol1 is None or mol2 is None:
+        return None
+    fp1 = AllChem.GetMorganFingerprintAsBitVect(mol1, radius, nBits=n_bits)
+    fp2 = AllChem.GetMorganFingerprintAsBitVect(mol2, radius, nBits=n_bits)
+    return round(float(DataStructs.TanimotoSimilarity(fp1, fp2)), 6)

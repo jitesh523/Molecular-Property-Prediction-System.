@@ -14,6 +14,7 @@ from molprop.features.fingerprints import (
     batch_smiles_to_morgan,
     smiles_to_maccs,
     smiles_to_morgan,
+    tanimoto_similarity,
 )
 from molprop.features.graphs import smiles_to_graph
 
@@ -146,3 +147,36 @@ class TestGraphConstruction:
         graph = smiles_to_graph(VALID_SMILES)
         # Benzene: 6 bonds → 12 directed edges
         assert graph.edge_index.shape[1] == 12
+
+
+class TestTanimotoSimilarity:
+    def test_identical_molecules(self):
+        """Same molecule should have similarity 1.0."""
+        sim = tanimoto_similarity(VALID_SMILES, VALID_SMILES)
+        assert sim == 1.0
+
+    def test_range(self):
+        """Similarity must lie in [0, 1]."""
+        sim = tanimoto_similarity(VALID_SMILES, ASPIRIN)
+        assert sim is not None
+        assert 0.0 <= sim <= 1.0
+
+    def test_symmetry(self):
+        """Tanimoto similarity is symmetric."""
+        sim_ab = tanimoto_similarity(VALID_SMILES, ASPIRIN)
+        sim_ba = tanimoto_similarity(ASPIRIN, VALID_SMILES)
+        assert sim_ab == sim_ba
+
+    def test_invalid_first_smiles_returns_none(self):
+        sim = tanimoto_similarity(INVALID_SMILES, VALID_SMILES)
+        assert sim is None
+
+    def test_invalid_second_smiles_returns_none(self):
+        sim = tanimoto_similarity(VALID_SMILES, INVALID_SMILES)
+        assert sim is None
+
+    def test_dissimilar_molecules(self):
+        """Benzene and a large drug-like molecule should have low similarity."""
+        sim = tanimoto_similarity("c1ccccc1", ASPIRIN)
+        assert sim is not None
+        assert sim < 0.8

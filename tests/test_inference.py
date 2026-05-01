@@ -188,3 +188,71 @@ def test_search_invalid_smiles(client):
     if ml_models.get("model") is not None:
         response = client.get("/search", params={"smiles": "NOT_VALID"})
         assert response.status_code == 400
+
+
+# ── /compare ───────────────────────────────────────────────────────────────────
+
+
+def test_compare_valid_pair(client):
+    """Two valid SMILES should return profiles and a Tanimoto score."""
+    response = client.post(
+        "/compare",
+        json={"smiles_a": "c1ccccc1", "smiles_b": "CC(=O)OC1=CC=CC=C1C(=O)O"},
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert "molecule_a" in data
+    assert "molecule_b" in data
+    assert "tanimoto_similarity" in data
+    assert data["tanimoto_similarity"] is not None
+    assert 0.0 <= data["tanimoto_similarity"] <= 1.0
+
+
+def test_compare_identical_molecules(client):
+    """Same molecule should yield Tanimoto similarity of 1.0."""
+    response = client.post(
+        "/compare",
+        json={"smiles_a": "c1ccccc1", "smiles_b": "c1ccccc1"},
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["tanimoto_similarity"] == 1.0
+
+
+def test_compare_descriptors_present(client):
+    """Profiles should include 18 physicochemical descriptors."""
+    response = client.post(
+        "/compare",
+        json={"smiles_a": "c1ccccc1", "smiles_b": "CCO"},
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data["molecule_a"]["descriptors"]) == 18
+    assert len(data["molecule_b"]["descriptors"]) == 18
+
+
+def test_compare_lipinski_present(client):
+    """Each profile must expose Lipinski Ro5 results."""
+    response = client.post(
+        "/compare",
+        json={"smiles_a": "c1ccccc1", "smiles_b": "CCO"},
+    )
+    assert response.status_code == 200
+    data = response.json()
+    for profile_key in ("molecule_a", "molecule_b"):
+        ro5 = data[profile_key]["lipinski"]
+        assert ro5 is not None
+        assert "passes" in ro5
+        assert "MW" in ro5
+
+
+def test_compare_one_invalid_smiles(client):
+    """One invalid SMILES should produce an error profile but not crash."""
+    response = client.post(
+        "/compare",
+        json={"smiles_a": "NOT_VALID_XYZ", "smiles_b": "c1ccccc1"},
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["molecule_a"]["error"] is not None
+    assert data["tanimoto_similarity"] is None

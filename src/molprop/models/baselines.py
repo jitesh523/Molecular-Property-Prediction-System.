@@ -13,7 +13,7 @@ from sklearn.metrics import (
     r2_score,
     roc_auc_score,
 )
-from sklearn.model_selection import StratifiedKFold, KFold
+from sklearn.model_selection import KFold, StratifiedKFold
 from xgboost import XGBClassifier, XGBRegressor
 
 log = logging.getLogger(__name__)

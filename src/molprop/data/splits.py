@@ -181,12 +181,8 @@ def stratified_split(
 
     # Second split: split remaining into train and val
     val_frac_of_remaining = frac_val / (frac_train + frac_val)
-    sss_val = StratifiedShuffleSplit(
-        n_splits=1, test_size=val_frac_of_remaining, random_state=seed
-    )
-    train_idx, val_idx = next(
-        sss_val.split(train_val_idx, labels_arr[train_val_idx])
-    )
+    sss_val = StratifiedShuffleSplit(n_splits=1, test_size=val_frac_of_remaining, random_state=seed)
+    train_idx, val_idx = next(sss_val.split(train_val_idx, labels_arr[train_val_idx]))
 
     return (
         train_val_idx[train_idx].tolist(),

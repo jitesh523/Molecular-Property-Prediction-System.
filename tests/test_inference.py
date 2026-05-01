@@ -99,9 +99,7 @@ def test_descriptors_valid_smiles(client):
 
 def test_descriptors_with_maccs(client):
     """include_fingerprint=True should add a 167-element list."""
-    response = client.post(
-        "/descriptors", json={"smiles": "c1ccccc1", "include_fingerprint": True}
-    )
+    response = client.post("/descriptors", json={"smiles": "c1ccccc1", "include_fingerprint": True})
     assert response.status_code == 200
     data = response.json()
     assert data["maccs_fingerprint"] is not None

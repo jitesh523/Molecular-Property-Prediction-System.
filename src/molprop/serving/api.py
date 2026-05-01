@@ -102,7 +102,7 @@ async def lifespan(app: FastAPI):
     vocab_path = ROOT / f"vocab_vae_{vae_dataset}.json"
     if vae_ckpt.exists() and vocab_path.exists():
         try:
-            ck = torch.load(vae_ckpt, map_location="cpu", weights_only=False)
+            ck = torch.load(vae_ckpt, map_location="cpu", weights_only=False)  # nosec B614
             vocab = SmilesVocab.load(vocab_path)
             vae = SMILESVAE(
                 vocab_size=ck["vocab_size"],
@@ -452,7 +452,7 @@ async def compute_descriptors(req: DescriptorRequest):
             error="Failed to compute descriptors.",
         )
 
-    desc_dict = dict(zip(get_descriptor_names(), desc_arr.tolist()))
+    desc_dict = dict(zip(get_descriptor_names(), desc_arr.tolist(), strict=False))
 
     maccs = None
     if req.include_fingerprint:
@@ -621,7 +621,9 @@ def _build_profile(smiles: str) -> MoleculeProfile:
         return MoleculeProfile(smiles=smiles, error="Invalid or unparseable SMILES.")
     desc_arr = smiles_to_descriptors(std)
     desc_dict = (
-        dict(zip(get_descriptor_names(), desc_arr.tolist())) if desc_arr is not None else None
+        dict(zip(get_descriptor_names(), desc_arr.tolist(), strict=False))
+        if desc_arr is not None
+        else None
     )
     ro5 = passes_lipinski_ro5(std)
     return MoleculeProfile(

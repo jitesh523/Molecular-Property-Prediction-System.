@@ -1,7 +1,7 @@
 FROM python:3.11-slim AS builder
 
 LABEL maintainer="Molecular Property Prediction System"
-LABEL version="1.0.0"
+LABEL version="1.4.0"
 LABEL description="Production inference API for molecular property prediction"
 
 WORKDIR /app
@@ -46,8 +46,9 @@ RUN pip install --no-cache-dir \
 COPY --from=builder /app/dist/*.whl ./
 RUN pip install --no-cache-dir *.whl && rm *.whl
 
-# Copy models and source
-COPY best_model_*.pt ./
+# Copy source code
+# Model weights (.pt files) are NOT baked into the image.
+# Mount them at runtime: docker run -v /path/to/weights:/app ...
 COPY src ./src
 
 ENV PYTHONPATH=/app/src

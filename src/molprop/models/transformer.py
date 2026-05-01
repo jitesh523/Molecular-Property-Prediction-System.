@@ -20,7 +20,7 @@ class SMILESTransformer(nn.Module):
 
         # Load the base model.
         # num_labels maps directly to the number of tasks in the regression/classification head.
-        self.model = AutoModelForSequenceClassification.from_pretrained(
+        self.model = AutoModelForSequenceClassification.from_pretrained(  # nosec B615
             model_name, num_labels=num_tasks, classifier_dropout=dropout
         )
 

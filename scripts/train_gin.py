@@ -130,12 +130,8 @@ def run_training(cfg: DictConfig):
     train_loader = DataLoader(
         [dataset[i] for i in train_idx], batch_size=cfg.training.batch_size, shuffle=True
     )
-    val_loader = DataLoader(
-        [dataset[i] for i in val_idx], batch_size=cfg.training.batch_size
-    )
-    test_loader = DataLoader(
-        [dataset[i] for i in test_idx], batch_size=cfg.training.batch_size
-    )
+    val_loader = DataLoader([dataset[i] for i in val_idx], batch_size=cfg.training.batch_size)
+    test_loader = DataLoader([dataset[i] for i in test_idx], batch_size=cfg.training.batch_size)
 
     # ── Model ─────────────────────────────────────────────────────────────────
     in_dim = dataset[0].num_node_features
@@ -150,9 +146,7 @@ def run_training(cfg: DictConfig):
     total_params = sum(p.numel() for p in model.parameters())
     log.info(f"GIN parameters: {total_params:,}")
 
-    optimizer = torch.optim.AdamW(
-        model.parameters(), lr=cfg.training.lr, weight_decay=1e-4
-    )
+    optimizer = torch.optim.AdamW(model.parameters(), lr=cfg.training.lr, weight_decay=1e-4)
     scheduler = CosineAnnealingLR(optimizer, T_max=cfg.training.epochs, eta_min=1e-5)
 
     # ── Training Loop ─────────────────────────────────────────────────────────
@@ -213,7 +207,7 @@ def run_training(cfg: DictConfig):
             model.load_state_dict(
                 torch.load(best_model_path, map_location=device, weights_only=True)
             )
-            test_score = evaluate(model, test_loader, device, cfg.dataset.task_type)
+            evaluate(model, test_loader, device, cfg.dataset.task_type)
 
             y_true_list, y_pred_list = [], []
             model.eval()

@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch_geometric.nn import GINConv, BatchNorm
+from torch_geometric.nn import BatchNorm, GINConv
 
 from molprop.models.gnn_base import GNNBase
 
@@ -37,7 +37,7 @@ class GINModel(GNNBase):
         is_training = self.training or mc_dropout
 
         node_embeddings = []
-        for conv, bn in zip(self.convs, self.batch_norms):
+        for conv, bn in zip(self.convs, self.batch_norms, strict=False):
             x = conv(x, edge_index)
             x = bn(x)
             x = F.relu(x)
@@ -53,7 +53,7 @@ class GINModel(GNNBase):
     def encode(self, data):
         x, edge_index, batch = data.x, data.edge_index, data.batch
         node_embeddings = []
-        for conv, bn in zip(self.convs, self.batch_norms):
+        for conv, bn in zip(self.convs, self.batch_norms, strict=False):
             x = conv(x, edge_index)
             x = bn(x)
             x = F.relu(x)

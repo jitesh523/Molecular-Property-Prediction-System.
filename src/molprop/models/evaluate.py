@@ -13,8 +13,8 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
-from sklearn.calibration import calibration_curve
 from scipy.stats import pearsonr
+from sklearn.calibration import calibration_curve
 from sklearn.metrics import (
     PrecisionRecallDisplay,
     RocCurveDisplay,

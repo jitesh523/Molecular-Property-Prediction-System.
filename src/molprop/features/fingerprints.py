@@ -87,7 +87,9 @@ def batch_smiles_to_maccs(smiles_list: List[str]) -> np.ndarray:
     return np.stack(fps)
 
 
-def tanimoto_similarity(smiles1: str, smiles2: str, radius: int = 2, n_bits: int = 2048) -> Optional[float]:
+def tanimoto_similarity(
+    smiles1: str, smiles2: str, radius: int = 2, n_bits: int = 2048
+) -> Optional[float]:
     """
     Compute Tanimoto (Jaccard) similarity between two molecules using Morgan fingerprints.
 

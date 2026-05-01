@@ -5,15 +5,15 @@ Verifies forward passes, encode() methods, mc_dropout inference,
 and output shapes for both single-molecule and batch inputs.
 """
 
-import torch
 import pytest
+import torch
 from torch_geometric.data import Batch, Data
 
-from molprop.models.gnn_gcn import GCNModel
-from molprop.models.gnn_gat import GATModel
-from molprop.models.gnn_mpnn import MPNNModel
-from molprop.models.gnn_gin import GINModel
 from molprop.features.graphs import smiles_to_graph
+from molprop.models.gnn_gat import GATModel
+from molprop.models.gnn_gcn import GCNModel
+from molprop.models.gnn_gin import GINModel
+from molprop.models.gnn_mpnn import MPNNModel
 
 BENZENE = "c1ccccc1"
 ASPIRIN = "CC(=O)OC1=CC=CC=C1C(=O)O"

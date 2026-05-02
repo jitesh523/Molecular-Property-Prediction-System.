@@ -20,7 +20,12 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from molprop.data.smiles_vocab import SmilesVocab
-from molprop.data.standardize import passes_lipinski_ro5, standardize_smiles
+from molprop.data.standardize import (
+    ghose_filter,
+    passes_lipinski_ro5,
+    standardize_smiles,
+    veber_filter,
+)
 from molprop.features.conformers import generate_3d_conformer, mol_to_pdb
 from molprop.features.descriptors import get_descriptor_names, smiles_to_descriptors
 from molprop.features.fingerprints import smiles_to_maccs, tanimoto_similarity
@@ -134,7 +139,7 @@ app = FastAPI(
         "Supports single and batch predictions, chemical standardization, GNNExplainer interpretability, "
         "KNN structural search, and generative molecular design via SMILES VAE."
     ),
-    version="2.0.0",
+    version="2.1.0",
     lifespan=lifespan,
 )
 
@@ -589,6 +594,57 @@ async def check_lipinski(smiles: str):
         LogP=result["LogP"],
         HBD=result["HBD"],
         HBA=result["HBA"],
+    )
+
+
+# ── Drug-Likeness Panel Endpoint ──────────────────────────────────────────────
+
+
+class DrugLikenessResponse(BaseModel):
+    smiles: str
+    standardized_smiles: Optional[str] = None
+    lipinski: Optional[dict] = None
+    veber: Optional[dict] = None
+    ghose: Optional[dict] = None
+    overall_drug_like: Optional[bool] = None
+    error: Optional[str] = None
+
+
+@app.get("/druglikeness", response_model=DrugLikenessResponse, tags=["Cheminformatics"])
+async def check_druglikeness(smiles: str):
+    """
+    Comprehensive drug-likeness panel for a SMILES string.
+
+    Evaluates three complementary filters in a single call:
+
+    - **Lipinski Ro5** — oral bioavailability heuristic (MW ≤ 500, LogP ≤ 5,
+      HBD ≤ 5, HBA ≤ 10; max 1 violation allowed).
+    - **Veber** — oral bioavailability via conformational flexibility
+      (RotatableBonds ≤ 10 **and** TPSA ≤ 140 Å²; both must pass).
+    - **Ghose** — global drug-like property ranges (−0.4 ≤ LogP ≤ 5.6,
+      160 ≤ MW ≤ 480, 40 ≤ MR ≤ 130, 20 ≤ NumAtoms ≤ 70).
+
+    `overall_drug_like` is `true` only when **all three** filters pass.
+    """
+    std = standardize_smiles(smiles)
+    if not std:
+        return DrugLikenessResponse(smiles=smiles, error="Invalid or unparseable SMILES.")
+
+    lip = passes_lipinski_ro5(std)
+    veb = veber_filter(std)
+    gho = ghose_filter(std)
+
+    overall = None
+    if lip is not None and veb is not None and gho is not None:
+        overall = lip["passes"] and veb["passes"] and gho["passes"]
+
+    return DrugLikenessResponse(
+        smiles=smiles,
+        standardized_smiles=std,
+        lipinski=lip,
+        veber=veb,
+        ghose=gho,
+        overall_drug_like=overall,
     )
 
 

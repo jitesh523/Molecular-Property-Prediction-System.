@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.0] - 2026-05-02
+
+### Added
+- `veber_filter()` in `standardize.py` — evaluates Veber's oral bioavailability rules (RotatableBonds ≤ 10, TPSA ≤ 140 Å²); returns property values and violation list (Veber et al., J. Med. Chem. 2002).
+- `ghose_filter()` in `standardize.py` — evaluates Ghose drug-likeness criteria (−0.4 ≤ LogP ≤ 5.6, 160 ≤ MW ≤ 480, 40 ≤ MR ≤ 130, 20 ≤ NumAtoms ≤ 70); Ghose et al., J. Comb. Chem. 1999.
+- `GET /druglikeness` REST endpoint — comprehensive drug-likeness panel running Lipinski Ro5 + Veber + Ghose in a single call with `overall_drug_like` summary flag.
+- `feature_importances()` method on `BaselineModel` — returns a dict of feature name → importance score (sorted descending), supporting both RandomForest and XGBoost; raises `AttributeError` if model not yet fitted.
+- `tests/test_baselines.py` — 20 unit tests for `BaselineModel` covering RF/XGBoost train, predict, evaluate, cross_validate, save/load, feature_importances, and error handling (entirely missing before).
+- 10 new Veber/Ghose tests in `test_standardize.py`.
+- 4 new `/druglikeness` integration tests in `test_inference.py`.
+- API version bumped to `2.1.0` in the FastAPI app metadata.
+
 ## [1.4.0] - 2026-05-01
 
 ### Added

@@ -115,3 +115,101 @@ def passes_lipinski_ro5(
         "HBD": hbd,
         "HBA": hba,
     }
+
+
+def veber_filter(
+    smiles: str,
+    rot_bonds_limit: int = 10,
+    tpsa_limit: float = 140.0,
+) -> Optional[Dict]:
+    """
+    Veber's oral bioavailability filter.
+
+    A molecule passes if **both** conditions hold:
+    - Rotatable bonds ≤ ``rot_bonds_limit`` (default 10)
+    - TPSA ≤ ``tpsa_limit`` Å² (default 140)
+
+    Reference: Veber et al., J. Med. Chem. 2002, 45, 2615–2623.
+
+    Args:
+        smiles: Input SMILES string.
+        rot_bonds_limit: Maximum allowed rotatable bonds.
+        tpsa_limit: Maximum allowed TPSA (Å²).
+
+    Returns:
+        Dict with 'passes' (bool), 'violations' (list), 'RotatableBonds' and
+        'TPSA' values, or None if the SMILES is invalid.
+    """
+    std = standardize_smiles(smiles)
+    if std is None:
+        return None
+    mol = Chem.MolFromSmiles(std)
+    if mol is None:
+        return None
+
+    rot_bonds = Descriptors.NumRotatableBonds(mol)
+    tpsa = Descriptors.TPSA(mol)
+
+    violations = []
+    if rot_bonds > rot_bonds_limit:
+        violations.append(f"RotatableBonds={rot_bonds} > {rot_bonds_limit}")
+    if tpsa > tpsa_limit:
+        violations.append(f"TPSA={tpsa:.1f} > {tpsa_limit}")
+
+    return {
+        "passes": len(violations) == 0,
+        "violations": violations,
+        "RotatableBonds": rot_bonds,
+        "TPSA": round(tpsa, 2),
+    }
+
+
+def ghose_filter(smiles: str) -> Optional[Dict]:
+    """
+    Ghose drug-likeness filter.
+
+    A molecule passes if **all four** property ranges are satisfied:
+    - −0.4 ≤ LogP ≤ 5.6
+    - 160 ≤ MW ≤ 480 Da
+    - 40 ≤ Molar Refractivity ≤ 130
+    - 20 ≤ NumAtoms ≤ 70
+
+    Reference: Ghose et al., J. Comb. Chem. 1999, 1, 55–68.
+
+    Args:
+        smiles: Input SMILES string.
+
+    Returns:
+        Dict with 'passes' (bool), 'violations' (list), and individual
+        property values (LogP, MW, MR, NumAtoms), or None for invalid SMILES.
+    """
+    std = standardize_smiles(smiles)
+    if std is None:
+        return None
+    mol = Chem.MolFromSmiles(std)
+    if mol is None:
+        return None
+
+    logp = Descriptors.MolLogP(mol)
+    mw = Descriptors.MolWt(mol)
+    mr = Descriptors.MolMR(mol)
+    num_atoms = mol.GetNumAtoms()
+
+    violations = []
+    if not (-0.4 <= logp <= 5.6):
+        violations.append(f"LogP={logp:.2f} outside [-0.4, 5.6]")
+    if not (160 <= mw <= 480):
+        violations.append(f"MW={mw:.1f} outside [160, 480]")
+    if not (40 <= mr <= 130):
+        violations.append(f"MR={mr:.1f} outside [40, 130]")
+    if not (20 <= num_atoms <= 70):
+        violations.append(f"NumAtoms={num_atoms} outside [20, 70]")
+
+    return {
+        "passes": len(violations) == 0,
+        "violations": violations,
+        "LogP": round(logp, 3),
+        "MW": round(mw, 2),
+        "MR": round(mr, 2),
+        "NumAtoms": num_atoms,
+    }

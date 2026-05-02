@@ -188,6 +188,45 @@ def test_search_invalid_smiles(client):
         assert response.status_code == 400
 
 
+# ── /druglikeness ──────────────────────────────────────────────────────────────
+
+
+def test_druglikeness_aspirin(client):
+    """Aspirin should pass all three filters."""
+    response = client.get("/druglikeness", params={"smiles": "CC(=O)OC1=CC=CC=C1C(=O)O"})
+    assert response.status_code == 200
+    data = response.json()
+    assert data["error"] is None
+    assert data["lipinski"] is not None
+    assert data["veber"] is not None
+    assert data["ghose"] is not None
+    assert "overall_drug_like" in data
+
+
+def test_druglikeness_all_filter_keys(client):
+    """Response must expose all three filter result dicts."""
+    response = client.get("/druglikeness", params={"smiles": "c1ccccc1"})
+    assert response.status_code == 200
+    data = response.json()
+    assert "passes" in data["lipinski"]
+    assert "passes" in data["veber"]
+    assert "passes" in data["ghose"]
+
+
+def test_druglikeness_invalid_smiles(client):
+    response = client.get("/druglikeness", params={"smiles": "NOT_VALID_XYZ"})
+    assert response.status_code == 200
+    assert response.json()["error"] is not None
+
+
+def test_druglikeness_overall_bool(client):
+    """overall_drug_like must be a boolean for valid input."""
+    response = client.get("/druglikeness", params={"smiles": "CC(=O)OC1=CC=CC=C1C(=O)O"})
+    assert response.status_code == 200
+    overall = response.json()["overall_drug_like"]
+    assert isinstance(overall, bool)
+
+
 # ── /compare ───────────────────────────────────────────────────────────────────
 
 

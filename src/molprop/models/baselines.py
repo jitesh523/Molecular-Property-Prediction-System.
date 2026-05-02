@@ -1,6 +1,6 @@
 import logging
 from pathlib import Path
-from typing import Dict, List, Literal
+from typing import Dict, List, Literal, Optional
 
 import joblib
 import numpy as np
@@ -165,3 +165,36 @@ class BaselineModel:
             log.info(f"  Fold {fold_idx + 1}/{n_folds}: {metrics}")
 
         return fold_metrics
+
+    def feature_importances(self, feature_names: Optional[List[str]] = None) -> Dict[str, float]:
+        """
+        Return feature importances sorted by importance descending.
+
+        Works for RandomForest (``feature_importances_`` attribute) and
+        XGBoost (same attribute after fitting).
+
+        Args:
+            feature_names: Optional list of names, one per feature column.
+                If None, defaults to 'feature_0', 'feature_1', …
+
+        Returns:
+            Dict mapping feature name → importance score, sorted descending.
+
+        Raises:
+            AttributeError: If the model has not been fitted yet or does not
+                expose ``feature_importances_``.
+        """
+        if not hasattr(self.model, "feature_importances_"):
+            raise AttributeError(
+                f"{self.model_type} model does not expose feature_importances_. "
+                "Call train() first."
+            )
+        importances = self.model.feature_importances_
+        if feature_names is None:
+            feature_names = [f"feature_{i}" for i in range(len(importances))]
+        paired = sorted(
+            zip(feature_names, importances.tolist(), strict=False),
+            key=lambda x: x[1],
+            reverse=True,
+        )
+        return dict(paired)

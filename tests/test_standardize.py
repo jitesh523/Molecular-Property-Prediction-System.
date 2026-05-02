@@ -1,4 +1,9 @@
-from molprop.data.standardize import passes_lipinski_ro5, standardize_smiles
+from molprop.data.standardize import (
+    ghose_filter,
+    passes_lipinski_ro5,
+    standardize_smiles,
+    veber_filter,
+)
 
 
 def test_standardize_basic():
@@ -102,3 +107,82 @@ def test_lipinski_large_molecule_fails():
     result = passes_lipinski_ro5(cspa)
     if result is not None:
         assert not result["passes"] or len(result["violations"]) > 0
+
+
+# ── Veber Filter ───────────────────────────────────────────────────────────────
+
+
+def test_veber_aspirin_passes():
+    """Aspirin has 3 rotatable bonds and low TPSA — should pass Veber."""
+    result = veber_filter("CC(=O)OC1=CC=CC=C1C(=O)O")
+    assert result is not None
+    assert result["passes"] is True
+    assert result["violations"] == []
+
+
+def test_veber_benzene_passes():
+    """Benzene has 0 rotatable bonds and low TPSA."""
+    result = veber_filter("c1ccccc1")
+    assert result is not None
+    assert result["passes"] is True
+
+
+def test_veber_returns_property_values():
+    result = veber_filter("c1ccccc1")
+    assert "RotatableBonds" in result
+    assert "TPSA" in result
+    assert isinstance(result["RotatableBonds"], int)
+    assert isinstance(result["TPSA"], float)
+
+
+def test_veber_invalid_smiles_returns_none():
+    assert veber_filter("NOT_A_MOLECULE") is None
+
+
+def test_veber_custom_limits():
+    """Tightening limits should cause a simple molecule to fail."""
+    result = veber_filter("CC(=O)OC1=CC=CC=C1C(=O)O", rot_bonds_limit=2)
+    assert result is not None
+    assert result["passes"] is False
+    assert any("RotatableBonds" in v for v in result["violations"])
+
+
+# ── Ghose Filter ───────────────────────────────────────────────────────────────
+
+
+def test_ghose_aspirin_passes():
+    """Aspirin (MW≈180, LogP≈1.2) satisfies all Ghose ranges."""
+    result = ghose_filter("CC(=O)OC1=CC=CC=C1C(=O)O")
+    assert result is not None
+    assert result["passes"] is True
+    assert result["violations"] == []
+
+
+def test_ghose_returns_property_values():
+    result = ghose_filter("CC(=O)OC1=CC=CC=C1C(=O)O")
+    for key in ("LogP", "MW", "MR", "NumAtoms"):
+        assert key in result
+
+
+def test_ghose_benzene_fails_mw():
+    """Benzene (MW≈78) is below the 160 Da lower limit."""
+    result = ghose_filter("c1ccccc1")
+    assert result is not None
+    assert result["passes"] is False
+    assert any("MW" in v for v in result["violations"])
+
+
+def test_ghose_invalid_smiles_returns_none():
+    assert ghose_filter("NOT_A_MOLECULE") is None
+
+
+def test_ghose_large_molecule_fails():
+    """Cyclosporin A violates MW and NumAtoms upper bounds."""
+    cspa = (
+        "CC[C@@H]1NC(=O)[C@H]([C@H](CC)C)N(C)C(=O)[C@H](CC(C)C)NC(=O)"
+        "[C@@H](C(C)C)N(C)C(=O)[C@H](CC(C)C)NC(=O)[C@H](C)N(C)C(=O)"
+        "[C@H](CC(C)C)N(C)C(=O)[C@@H](CC(C)C)N(C)C(=O)[C@@H](C(C)C)NC1=O"
+    )
+    result = ghose_filter(cspa)
+    if result is not None:
+        assert result["passes"] is False

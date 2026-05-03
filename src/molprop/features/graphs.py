@@ -90,3 +90,24 @@ def smiles_to_graph(smiles: str, y: Optional[float] = None) -> Optional[Data]:
         y_tensor = torch.tensor([y], dtype=torch.float)
 
     return Data(x=x, edge_index=edge_index, edge_attr=edge_attr, y=y_tensor, smiles=smiles)
+
+
+def batch_smiles_to_graphs(
+    smiles_list: List[str],
+    labels: Optional[List[float]] = None,
+) -> List[Optional[Data]]:
+    """
+    Batch-convert a list of SMILES strings to PyTorch Geometric Data objects.
+
+    Args:
+        smiles_list: List of SMILES strings.
+        labels: Optional per-molecule target values aligned with ``smiles_list``.
+            When provided, each valid Data object will carry a ``y`` tensor.
+
+    Returns:
+        List of Data objects; ``None`` at position ``i`` means SMILES ``i``
+        was invalid or could not be featurized.
+    """
+    if labels is None:
+        labels = [None] * len(smiles_list)
+    return [smiles_to_graph(s, y=y) for s, y in zip(smiles_list, labels, strict=False)]

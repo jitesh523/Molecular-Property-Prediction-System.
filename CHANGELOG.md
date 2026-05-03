@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.0] - 2026-05-03
+
+### Added
+- `dice_similarity()` in `fingerprints.py` — Dice (Sørensen–Dice) molecular similarity via Morgan fingerprints (ECFP4, 2048-bit); complements `tanimoto_similarity()` and is preferred for molecules of unequal size (Dice ≥ Tanimoto, provably).
+- `batch_smiles_to_graphs()` in `graphs.py` — missing batch wrapper over `smiles_to_graph()`, consistent with batch functions in `fingerprints.py` and `descriptors.py`; supports optional per-molecule label attachment.
+- `GET /scaffold` REST endpoint — returns the Bemis–Murcko scaffold SMILES for a molecule; returns `null` for acyclic compounds; 400 on invalid input.
+- `POST /batch/descriptors` REST endpoint — computes 18 ADMET/Lipinski descriptors for up to 100 SMILES in one call; returns per-molecule results with `error` fields for invalid entries and top-level `total`/`failed` counts.
+- `TestTemporalSplit` (6 tests) added to `test_splits.py` — `temporal_split` had zero test coverage; tests cover overlap, full coverage, chronological ordering, ratio accuracy, reverse-input, and custom fractions.
+- `TestDiceSimilarity` (6 tests) and `TestBatchSmilesToGraphs` (6 tests) added to `test_featurizers.py`.
+- 7 new integration tests in `test_inference.py` covering `/scaffold` (4 tests) and `/batch/descriptors` (3 tests).
+
 ## [1.5.0] - 2026-05-02
 
 ### Added

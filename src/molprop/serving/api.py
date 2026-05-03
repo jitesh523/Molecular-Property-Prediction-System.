@@ -10,7 +10,7 @@ import os
 import time
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import Optional
+from typing import List, Optional
 
 import pandas as pd
 import torch
@@ -20,6 +20,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from molprop.data.smiles_vocab import SmilesVocab
+from molprop.data.splits import generate_scaffold
 from molprop.data.standardize import (
     ghose_filter,
     passes_lipinski_ro5,
@@ -470,6 +471,87 @@ async def compute_descriptors(req: DescriptorRequest):
         descriptors=desc_dict,
         maccs_fingerprint=maccs,
     )
+
+
+# ── Batch Descriptor Endpoint ───────────────────────────────────────────────
+
+
+class BatchDescriptorRequest(BaseModel):
+    smiles_list: List[str] = Field(
+        ...,
+        min_length=1,
+        max_length=MAX_BATCH_SIZE,
+        description="List of SMILES strings (max 100)",
+    )
+
+
+class BatchDescriptorItem(BaseModel):
+    smiles: str
+    standardized_smiles: Optional[str] = None
+    descriptors: Optional[dict[str, float]] = None
+    error: Optional[str] = None
+
+
+class BatchDescriptorResponse(BaseModel):
+    results: List[BatchDescriptorItem]
+    total: int
+    failed: int
+
+
+@app.post("/batch/descriptors", response_model=BatchDescriptorResponse, tags=["Cheminformatics"])
+async def batch_descriptors(req: BatchDescriptorRequest):
+    """
+    Compute physicochemical descriptors for a batch of SMILES strings.
+
+    Accepts up to ``MAX_BATCH_SIZE`` (100) molecules per call. Each result
+    contains the same 18 ADMET/Lipinski descriptors as the single-molecule
+    ``/descriptors`` endpoint, plus an error field for invalid entries.
+    Summary counts (total, failed) are included at the top level.
+    """
+    results: List[BatchDescriptorItem] = []
+    failed = 0
+    for smiles in req.smiles_list:
+        std = standardize_smiles(smiles)
+        if not std:
+            results.append(BatchDescriptorItem(smiles=smiles, error="Invalid SMILES."))
+            failed += 1
+            continue
+        desc_arr = smiles_to_descriptors(std)
+        if desc_arr is None:
+            results.append(
+                BatchDescriptorItem(
+                    smiles=smiles,
+                    standardized_smiles=std,
+                    error="Descriptor computation failed.",
+                )
+            )
+            failed += 1
+            continue
+        desc_dict = dict(zip(get_descriptor_names(), desc_arr.tolist(), strict=False))
+        results.append(
+            BatchDescriptorItem(smiles=smiles, standardized_smiles=std, descriptors=desc_dict)
+        )
+    return BatchDescriptorResponse(results=results, total=len(results), failed=failed)
+
+
+# ── Scaffold Endpoint ─────────────────────────────────────────────────────────
+
+
+@app.get("/scaffold", tags=["Cheminformatics"])
+async def get_scaffold(smiles: str):
+    """
+    Return the Bemis–Murcko scaffold for a SMILES string.
+
+    Scaffolds represent the ring systems and linkers of a molecule after
+    side-chain stripping. They are the standard unit for scaffold hopping,
+    chemical diversity analysis, and dataset stratification.
+    Returns ``null`` for molecules with no ring systems (acyclic compounds).
+    """
+    std = standardize_smiles(smiles)
+    if not std:
+        raise HTTPException(status_code=400, detail="Invalid or unparseable SMILES.")
+    scaffold = generate_scaffold(std) or None
+    return {"smiles": smiles, "standardized_smiles": std, "scaffold": scaffold}
 
 
 # ── Similarity Search Endpoint ───────────────────────────────────────────────

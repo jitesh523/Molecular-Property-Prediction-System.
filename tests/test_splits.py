@@ -2,12 +2,16 @@
 Tests for scaffold splitting: integrity, no leakage, determinism, coverage.
 """
 
+import pandas as pd
+import pytest
+
 from molprop.data.splits import (
     generate_scaffold,
     random_scaffold_split,
     scaffold_kfold,
     scaffold_split,
     stratified_split,
+    temporal_split,
 )
 
 # Diverse SMILES that produce different Bemis-Murcko scaffolds
@@ -189,3 +193,55 @@ class TestScaffoldKFold:
         s1 = scaffold_kfold(SAMPLE_SMILES, n_folds=3, seed=42)
         s2 = scaffold_kfold(SAMPLE_SMILES, n_folds=3, seed=42)
         assert s1 == s2
+
+
+class TestTemporalSplit:
+    N = 30
+
+    def _make_df(self, n=None):
+        n = n or self.N
+        return pd.DataFrame({"time": list(range(n)), "smiles": ["C"] * n})
+
+    def test_no_index_overlap(self):
+        df = self._make_df()
+        train, val, test = temporal_split(df, "time")
+        assert len(set(train) & set(val)) == 0
+        assert len(set(train) & set(test)) == 0
+        assert len(set(val) & set(test)) == 0
+
+    def test_full_coverage(self):
+        df = self._make_df()
+        train, val, test = temporal_split(df, "time")
+        all_indices = sorted(train + val + test)
+        assert all_indices == sorted(df.index.tolist())
+
+    def test_chronological_order(self):
+        """Train times must all precede test times."""
+        df = self._make_df()
+        train, val, test = temporal_split(df, "time")
+        if train and test:
+            max_train_time = df.loc[train, "time"].max()
+            min_test_time = df.loc[test, "time"].min()
+            assert max_train_time < min_test_time
+
+    def test_approximate_ratios(self):
+        df = self._make_df()
+        train, val, test = temporal_split(df, "time", frac_train=0.8, frac_val=0.1, frac_test=0.1)
+        n = len(df)
+        assert len(train) == pytest.approx(n * 0.8, abs=1)
+        assert len(val) == pytest.approx(n * 0.1, abs=1)
+        assert len(test) == pytest.approx(n * 0.1, abs=1)
+
+    def test_unsorted_input_still_sorted_by_time(self):
+        """Input rows in reverse order — split should still be time-ordered."""
+        df = pd.DataFrame({"time": list(range(20, 0, -1)), "smiles": ["C"] * 20})
+        train, _, test = temporal_split(df, "time")
+        if train and test:
+            max_train_time = df.loc[train, "time"].max()
+            min_test_time = df.loc[test, "time"].min()
+            assert max_train_time < min_test_time
+
+    def test_custom_fractions(self):
+        df = self._make_df(60)
+        train, val, test = temporal_split(df, "time", frac_train=0.7, frac_val=0.2, frac_test=0.1)
+        assert len(train) + len(val) + len(test) == len(df)

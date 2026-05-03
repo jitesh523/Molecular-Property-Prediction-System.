@@ -188,6 +188,80 @@ def test_search_invalid_smiles(client):
         assert response.status_code == 400
 
 
+# ── /scaffold ─────────────────────────────────────────────────────────────────
+
+
+def test_scaffold_cyclic_molecule(client):
+    """Benzene has a scaffold (itself)."""
+    response = client.get("/scaffold", params={"smiles": "c1ccccc1"})
+    assert response.status_code == 200
+    data = response.json()
+    assert data["scaffold"] is not None
+    assert isinstance(data["scaffold"], str)
+
+
+def test_scaffold_acyclic_molecule(client):
+    """Acyclic molecules return null scaffold."""
+    response = client.get("/scaffold", params={"smiles": "CCO"})
+    assert response.status_code == 200
+    data = response.json()
+    assert data["scaffold"] is None
+
+
+def test_scaffold_invalid_smiles_returns_400(client):
+    response = client.get("/scaffold", params={"smiles": "NOT_VALID"})
+    assert response.status_code == 400
+
+
+def test_scaffold_response_keys(client):
+    response = client.get("/scaffold", params={"smiles": "c1ccccc1"})
+    assert response.status_code == 200
+    data = response.json()
+    for key in ("smiles", "standardized_smiles", "scaffold"):
+        assert key in data
+
+
+# ── /batch/descriptors ─────────────────────────────────────────────────────────
+
+
+def test_batch_descriptors_valid(client):
+    """Two valid SMILES → two descriptor dicts with no errors."""
+    response = client.post(
+        "/batch/descriptors",
+        json={"smiles_list": ["c1ccccc1", "CC(=O)OC1=CC=CC=C1C(=O)O"]},
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["total"] == 2
+    assert data["failed"] == 0
+    for item in data["results"]:
+        assert item["error"] is None
+        assert len(item["descriptors"]) == 18
+
+
+def test_batch_descriptors_mixed_valid_invalid(client):
+    """Invalid SMILES should be counted in 'failed' without breaking the batch."""
+    response = client.post(
+        "/batch/descriptors",
+        json={"smiles_list": ["c1ccccc1", "NOT_VALID_XYZ", "CCO"]},
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["total"] == 3
+    assert data["failed"] == 1
+    assert data["results"][1]["error"] is not None
+
+
+def test_batch_descriptors_descriptor_keys(client):
+    """Every result must expose the same 18 descriptor keys as /descriptors."""
+    response = client.post("/batch/descriptors", json={"smiles_list": ["c1ccccc1"]})
+    assert response.status_code == 200
+    desc = response.json()["results"][0]["descriptors"]
+    assert "MolLogP" in desc
+    assert "TPSA" in desc
+    assert "BertzCT" in desc
+
+
 # ── /druglikeness ──────────────────────────────────────────────────────────────
 
 

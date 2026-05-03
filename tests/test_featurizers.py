@@ -12,11 +12,12 @@ from molprop.features.descriptors import (
 from molprop.features.fingerprints import (
     batch_smiles_to_maccs,
     batch_smiles_to_morgan,
+    dice_similarity,
     smiles_to_maccs,
     smiles_to_morgan,
     tanimoto_similarity,
 )
-from molprop.features.graphs import smiles_to_graph
+from molprop.features.graphs import batch_smiles_to_graphs, smiles_to_graph
 
 VALID_SMILES = "c1ccccc1"  # benzene
 ASPIRIN = "CC(=O)OC1=CC=CC=C1C(=O)O"
@@ -180,3 +181,65 @@ class TestTanimotoSimilarity:
         sim = tanimoto_similarity("c1ccccc1", ASPIRIN)
         assert sim is not None
         assert sim < 0.8
+
+
+class TestDiceSimilarity:
+    def test_identical_molecules(self):
+        """Same molecule must yield Dice similarity of 1.0."""
+        assert dice_similarity(VALID_SMILES, VALID_SMILES) == 1.0
+
+    def test_range(self):
+        sim = dice_similarity(VALID_SMILES, ASPIRIN)
+        assert sim is not None
+        assert 0.0 <= sim <= 1.0
+
+    def test_symmetry(self):
+        assert dice_similarity(VALID_SMILES, ASPIRIN) == dice_similarity(ASPIRIN, VALID_SMILES)
+
+    def test_invalid_first_smiles_returns_none(self):
+        assert dice_similarity(INVALID_SMILES, VALID_SMILES) is None
+
+    def test_invalid_second_smiles_returns_none(self):
+        assert dice_similarity(VALID_SMILES, INVALID_SMILES) is None
+
+    def test_dice_ge_tanimoto_for_different_sizes(self):
+        """For two non-identical molecules Dice >= Tanimoto (provable algebraically)."""
+        sim_dice = dice_similarity(VALID_SMILES, ASPIRIN)
+        sim_tan = tanimoto_similarity(VALID_SMILES, ASPIRIN)
+        assert sim_dice is not None and sim_tan is not None
+        assert sim_dice >= sim_tan - 1e-6
+
+
+class TestBatchSmilesToGraphs:
+    SMILES = [VALID_SMILES, ASPIRIN, "CCO"]
+    LABELS = [1.0, 0.0, 1.0]
+
+    def test_length_matches_input(self):
+        graphs = batch_smiles_to_graphs(self.SMILES)
+        assert len(graphs) == len(self.SMILES)
+
+    def test_all_valid_returns_data_objects(self):
+        graphs = batch_smiles_to_graphs(self.SMILES)
+        for g in graphs:
+            assert g is not None
+
+    def test_invalid_smiles_yields_none(self):
+        graphs = batch_smiles_to_graphs([VALID_SMILES, INVALID_SMILES])
+        assert graphs[0] is not None
+        assert graphs[1] is None
+
+    def test_labels_attached_to_y(self):
+        graphs = batch_smiles_to_graphs(self.SMILES, labels=self.LABELS)
+        for g, lbl in zip(graphs, self.LABELS, strict=False):
+            assert g is not None
+            assert g.y is not None
+            assert float(g.y) == lbl
+
+    def test_no_labels_y_is_none(self):
+        graphs = batch_smiles_to_graphs(self.SMILES)
+        for g in graphs:
+            assert g.y is None
+
+    def test_node_feature_dim(self):
+        graphs = batch_smiles_to_graphs([VALID_SMILES])
+        assert graphs[0].x.shape[1] == 9

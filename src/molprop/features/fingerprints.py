@@ -109,3 +109,31 @@ def tanimoto_similarity(
     fp1 = AllChem.GetMorganFingerprintAsBitVect(mol1, radius, nBits=n_bits)
     fp2 = AllChem.GetMorganFingerprintAsBitVect(mol2, radius, nBits=n_bits)
     return round(float(DataStructs.TanimotoSimilarity(fp1, fp2)), 6)
+
+
+def dice_similarity(
+    smiles1: str, smiles2: str, radius: int = 2, n_bits: int = 2048
+) -> Optional[float]:
+    """
+    Compute Dice (Sørensen–Dice) similarity between two molecules using Morgan fingerprints.
+
+    Dice = 2|A ∩ B| / (|A| + |B|), where |X| counts the set bits.
+    Dice weights shared bits more heavily than Tanimoto and is preferred
+    when comparing molecules of very different sizes.
+
+    Args:
+        smiles1: First SMILES string.
+        smiles2: Second SMILES string.
+        radius: Morgan fingerprint radius (default 2 → ECFP4).
+        n_bits: Fingerprint bit-vector length.
+
+    Returns:
+        Dice similarity in [0, 1], or None if either SMILES is invalid.
+    """
+    mol1 = Chem.MolFromSmiles(smiles1)
+    mol2 = Chem.MolFromSmiles(smiles2)
+    if mol1 is None or mol2 is None:
+        return None
+    fp1 = AllChem.GetMorganFingerprintAsBitVect(mol1, radius, nBits=n_bits)
+    fp2 = AllChem.GetMorganFingerprintAsBitVect(mol2, radius, nBits=n_bits)
+    return round(float(DataStructs.DiceSimilarity(fp1, fp2)), 6)

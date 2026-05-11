@@ -18,6 +18,9 @@ document.addEventListener("DOMContentLoaded", () => {
     const taskLabel = document.getElementById("task-label");
     const similarityPanel = document.getElementById("similarity-panel");
     const analogsContainer = document.getElementById("analogs-container");
+    const exampleSelect = document.getElementById("example-select");
+    const copySmilesBtn = document.getElementById("copy-smiles-btn");
+    const latencyDisplay = document.getElementById("latency-display");
 
     // ── Elements: Generate Tab ───────────────────────────────────────────────
     const generateBtn = document.getElementById("generate-btn");
@@ -118,6 +121,10 @@ document.addEventListener("DOMContentLoaded", () => {
             const data = await resp.json();
             if (!resp.ok) throw new Error(data.detail || "Inference failed");
 
+            // Server-reported latency from middleware
+            const timing = resp.headers.get("X-Process-Time");
+            if (timing && latencyDisplay) latencyDisplay.textContent = timing;
+
             // Populate Metrics
             const val = data.predictions.task_1;
             predValue.textContent = Number.isInteger(val) ? val : val.toFixed(4);
@@ -208,6 +215,33 @@ document.addEventListener("DOMContentLoaded", () => {
         document.querySelector('[data-tab="predict"]').click();
         predictBtn.click();
     };
+
+    // Examples dropdown -> populate input
+    if (exampleSelect) {
+        exampleSelect.addEventListener("change", (e) => {
+            const val = e.target.value;
+            if (val) {
+                smilesInput.value = val;
+                smilesInput.focus();
+            }
+        });
+    }
+
+    // Copy standardized SMILES to clipboard
+    if (copySmilesBtn) {
+        copySmilesBtn.addEventListener("click", async () => {
+            const text = stdSmilesDisplay.textContent || "";
+            if (!text || text === "—" || text === "-") return;
+            try {
+                await navigator.clipboard.writeText(text);
+                const prev = copySmilesBtn.textContent;
+                copySmilesBtn.textContent = "Copied ✓";
+                setTimeout(() => { copySmilesBtn.textContent = prev; }, 1200);
+            } catch (err) {
+                console.error("Clipboard write failed:", err);
+            }
+        });
+    }
 
     // Enter key support
     smilesInput.addEventListener("keypress", (e) => { if (e.key === "Enter") predictBtn.click(); });

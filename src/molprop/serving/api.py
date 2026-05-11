@@ -8,8 +8,12 @@ with batch support, model metadata, and explainability.
 import logging
 import os
 import time
+from collections import defaultdict
 from contextlib import asynccontextmanager
+from importlib.metadata import PackageNotFoundError
+from importlib.metadata import version as pkg_version
 from pathlib import Path
+from threading import Lock
 from typing import List, Optional
 
 import pandas as pd
@@ -156,13 +160,36 @@ app.add_middleware(
 # ── Timing Middleware ─────────────────────────────────────────────────────────
 
 
+# ── Lightweight in-process metrics registry ───────────────────────────────────
+
+_metrics_lock = Lock()
+_metrics: dict[str, dict] = {
+    "requests_total": defaultdict(int),
+    "requests_errors": defaultdict(int),
+    "latency_sum_s": defaultdict(float),
+    "started_at": time.time(),
+}
+
+
 @app.middleware("http")
 async def add_timing_header(request: Request, call_next):
-    """Add X-Process-Time header for observability."""
+    """Add X-Process-Time header and record in-process metrics."""
     start = time.perf_counter()
-    response = await call_next(request)
+    key = f"{request.method} {request.url.path}"
+    try:
+        response = await call_next(request)
+    except Exception:
+        with _metrics_lock:
+            _metrics["requests_total"][key] += 1
+            _metrics["requests_errors"][key] += 1
+        raise
     elapsed = time.perf_counter() - start
     response.headers["X-Process-Time"] = f"{elapsed:.4f}s"
+    with _metrics_lock:
+        _metrics["requests_total"][key] += 1
+        _metrics["latency_sum_s"][key] += elapsed
+        if response.status_code >= 400:
+            _metrics["requests_errors"][key] += 1
     return response
 
 
@@ -217,6 +244,44 @@ class ModelInfo(BaseModel):
 async def health():
     """Health check endpoint."""
     return {"status": "ok", "model_loaded": ml_models.get("model") is not None}
+
+
+@app.get("/version", tags=["System"])
+async def version():
+    """Return package version and key runtime metadata."""
+    try:
+        v = pkg_version("molprop")
+    except PackageNotFoundError:
+        v = "unknown"
+    return {
+        "version": v,
+        "api_version": app.version,
+        "torch": torch.__version__,
+        "model_loaded": ml_models.get("model") is not None,
+        "vae_loaded": bool(vae_state.get("model")),
+    }
+
+
+@app.get("/metrics", tags=["System"])
+async def metrics():
+    """Return simple in-process request metrics (JSON)."""
+    with _metrics_lock:
+        totals = dict(_metrics["requests_total"])
+        errors = dict(_metrics["requests_errors"])
+        latency_sum = dict(_metrics["latency_sum_s"])
+        started = _metrics["started_at"]
+
+    per_route = {}
+    for key, count in totals.items():
+        per_route[key] = {
+            "requests": count,
+            "errors": errors.get(key, 0),
+            "avg_latency_s": (latency_sum.get(key, 0.0) / count) if count else 0.0,
+        }
+    return {
+        "uptime_s": round(time.time() - started, 3),
+        "routes": per_route,
+    }
 
 
 @app.get("/model/info", response_model=ModelInfo, tags=["System"])
@@ -336,6 +401,8 @@ async def predict_batch(req: BatchPredictRequest):
     if ml_models.get("model") is None:
         raise HTTPException(status_code=503, detail="Model is not loaded on the server.")
 
+    if len(req.smiles_list) == 0:
+        raise HTTPException(status_code=400, detail="smiles_list must contain at least one entry.")
     if len(req.smiles_list) > MAX_BATCH_SIZE:
         raise HTTPException(
             status_code=400,

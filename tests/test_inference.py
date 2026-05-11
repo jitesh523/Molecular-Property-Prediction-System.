@@ -83,6 +83,42 @@ def test_response_has_timing_header(client):
     assert "x-process-time" in response.headers
 
 
+def test_version_endpoint(client):
+    """/version returns package and runtime metadata."""
+    response = client.get("/version")
+    assert response.status_code == 200
+    data = response.json()
+    assert "version" in data
+    assert "api_version" in data
+    assert "torch" in data
+    assert "model_loaded" in data
+
+
+def test_metrics_endpoint(client):
+    """/metrics returns uptime and per-route counters."""
+    client.get("/health")
+    response = client.get("/metrics")
+    assert response.status_code == 200
+    data = response.json()
+    assert "uptime_s" in data
+    assert "routes" in data
+    assert isinstance(data["routes"], dict)
+
+
+def test_batch_predict_empty_list(client):
+    """Empty smiles_list should reject with 400 or 422 before hitting model."""
+    removed = False
+    if not ml_models.get("model"):
+        ml_models["model"] = "dummy"
+        removed = True
+
+    response = client.post("/predict/batch", json={"smiles_list": []})
+    assert response.status_code in (400, 422)
+
+    if removed:
+        ml_models["model"] = None
+
+
 # ── /descriptors ──────────────────────────────────────────────────────────────────────
 
 

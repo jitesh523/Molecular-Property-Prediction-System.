@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.0] - 2026-05-11
+
+### Added
+- `GET /version` — returns package version, API version, and Torch runtime info.
+- `GET /metrics` — lightweight in-process request counters, error counts, average latency per route, and uptime.
+- Example-molecule dropdown, copy-to-clipboard button for standardized SMILES, and server-latency display in the web UI.
+- Developer `Makefile` with `install`, `dev`, `lint`, `format`, `test`, `cov`, `api`, and Docker targets.
+- Tests for `/version`, `/metrics`, and empty-batch validation on `/predict/batch`.
+
+### Changed
+- CI now runs a Python `3.11`/`3.12` matrix with workflow concurrency (`cancel-in-progress`) and uploads a coverage artifact on 3.11.
+- `POST /predict/batch` now returns `400` on empty `smiles_list` before reaching the model.
+- Request-timing middleware also records in-process counters consumed by `/metrics`.
+
 ## [1.6.0] - 2026-05-03
 
 ### Added

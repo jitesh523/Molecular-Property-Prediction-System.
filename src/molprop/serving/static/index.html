@@ -49,6 +49,20 @@
                         <button id="predict-btn" class="btn-primary">Predict →</button>
                     </div>
                     <div class="options-row">
+                        <label class="uncertainty-label">
+                            Examples:
+                            <select id="example-select">
+                                <option value="">— choose a molecule —</option>
+                                <option value="CC(=O)Oc1ccccc1C(=O)O">Aspirin</option>
+                                <option value="CN1C=NC2=C1C(=O)N(C(=O)N2C)C">Caffeine</option>
+                                <option value="CC(C)Cc1ccc(cc1)C(C)C(=O)O">Ibuprofen</option>
+                                <option value="CC(=O)NC1=CC=C(C=C1)O">Paracetamol</option>
+                                <option value="CN1CCC[C@H]1c2cccnc2">Nicotine</option>
+                                <option value="OC[C@H]1OC(O)[C@H](O)[C@@H](O)[C@@H]1O">Glucose</option>
+                            </select>
+                        </label>
+                    </div>
+                    <div class="options-row">
                         <label class="toggle-switch">
                             <input type="checkbox" id="explain-cb" checked>
                             <span class="slider"></span>
@@ -79,6 +93,11 @@
                             <div class="metric">
                                 <span class="label">Standardised SMILES</span>
                                 <span class="value std-smiles" id="std-smiles-display">—</span>
+                                <button id="copy-smiles-btn" class="btn-primary" style="margin-top:0.5rem;padding:0.3rem 0.6rem;font-size:0.7rem;">Copy</button>
+                            </div>
+                            <div class="metric">
+                                <span class="label">Server Latency</span>
+                                <span class="value" id="latency-display">—</span>
                             </div>
                         </div>
                     </div>

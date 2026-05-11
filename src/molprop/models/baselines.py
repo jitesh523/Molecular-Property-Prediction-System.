@@ -186,8 +186,7 @@ class BaselineModel:
         """
         if not hasattr(self.model, "feature_importances_"):
             raise AttributeError(
-                f"{self.model_type} model does not expose feature_importances_. "
-                "Call train() first."
+                f"{self.model_type} model does not expose feature_importances_. Call train() first."
             )
         importances = self.model.feature_importances_
         if feature_names is None:

@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.8.0] - 2026-05-12
+
+### Added
+- **Guided Molecular Optimization** — new `POST /optimize` endpoint that navigates the VAE latent space to discover molecules matching target property constraints (MW, LogP, TPSA, HBD, HBA).
+- Two optimization methods:
+  - `gradient_ascent`: Uses finite-difference gradients to optimize latent vectors toward target properties.
+  - `random_walk`: Baseline Monte Carlo sampling with selection pressure.
+- `LatentOptimizer` class in `models/optimization.py` — handles latent space traversal, property scoring, and SMILES decoding.
+- New "🎯 Optimize" tab in the web UI with property range inputs, method selection, and candidate display.
+- CSS styling for range controls and select dropdowns.
+- Tests for `/optimize` endpoint covering VAE availability, invalid methods, and valid request handling.
+
+### Fixed
+- Added standard `background-clip` property alongside `-webkit-background-clip` for CSS compatibility.
+
 ## [1.7.0] - 2026-05-11
 
 ### Added

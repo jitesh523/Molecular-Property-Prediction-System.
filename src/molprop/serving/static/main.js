@@ -33,6 +33,27 @@ document.addEventListener("DOMContentLoaded", () => {
     const genStats = document.getElementById("gen-stats");
     const vaeStatusBanner = document.getElementById("vae-status-banner");
 
+    // ── Elements: Optimize Tab ──────────────────────────────────────────────
+    const optimizeBtn = document.getElementById("optimize-btn");
+    const optMethod = document.getElementById("opt-method");
+    const optCandidates = document.getElementById("opt-candidates");
+    const optTempInput = document.getElementById("opt-temperature");
+    const optLoading = document.getElementById("optimize-loading");
+    const optResultsPanel = document.getElementById("optimize-results-panel");
+    const optGrid = document.getElementById("optimize-grid");
+    const optStats = document.getElementById("optimize-stats");
+    const optStatusBanner = document.getElementById("optimize-status-banner");
+    const optMwMin = document.getElementById("opt-mw-min");
+    const optMwMax = document.getElementById("opt-mw-max");
+    const optLogpMin = document.getElementById("opt-logp-min");
+    const optLogpMax = document.getElementById("opt-logp-max");
+    const optTpsaMin = document.getElementById("opt-tpsa-min");
+    const optTpsaMax = document.getElementById("opt-tpsa-max");
+    const optHbdMin = document.getElementById("opt-hbd-min");
+    const optHbdMax = document.getElementById("opt-hbd-max");
+    const optHbaMin = document.getElementById("opt-hba-min");
+    const optHbaMax = document.getElementById("opt-hba-max");
+
     // ── Elements: Global ─────────────────────────────────────────────────────
     const appTitle = document.getElementById("app-title");
     const badgeModel = document.getElementById("badge-model");
@@ -80,10 +101,18 @@ document.addEventListener("DOMContentLoaded", () => {
                 vaeStatusBanner.textContent = `✅ VAE Decoder Active: Latent dimension ${vData.latent_dim}, Vocab size ${vData.vocab_size}`;
                 vaeStatusBanner.className = "status-banner status-ready";
                 generateBtn.disabled = false;
+                if (optStatusBanner) {
+                    optStatusBanner.textContent = `✅ VAE Optimizer Ready: Latent dimension ${vData.latent_dim}`;
+                    optStatusBanner.className = "status-banner status-ready";
+                }
+                if (optimizeBtn) optimizeBtn.disabled = false;
             } else {
                 badgeVae.textContent = "VAE Inactive";
                 badgeVae.style.opacity = "0.5";
                 vaeStatusBanner.textContent = "⚠️ VAE Checkpoint not found on server. Start training with scripts/train_vae.py";
+                if (optStatusBanner) {
+                    optStatusBanner.textContent = "⚠️ VAE not loaded. Optimization requires a trained VAE model.";
+                }
             }
             apiBadges.classList.remove("hidden");
         } catch (err) {
@@ -215,6 +244,64 @@ document.addEventListener("DOMContentLoaded", () => {
         document.querySelector('[data-tab="predict"]').click();
         predictBtn.click();
     };
+
+    // ── Action: Optimize ────────────────────────────────────────────────────
+    if (optimizeBtn) {
+        optimizeBtn.addEventListener("click", async () => {
+            optGrid.innerHTML = '';
+            optResultsPanel.classList.add("hidden");
+            optLoading.classList.remove("hidden");
+            optimizeBtn.disabled = true;
+
+            const targets = {};
+            if (optMwMin && optMwMax) targets.mw = [parseFloat(optMwMin.value), parseFloat(optMwMax.value)];
+            if (optLogpMin && optLogpMax) targets.logp = [parseFloat(optLogpMin.value), parseFloat(optLogpMax.value)];
+            if (optTpsaMin && optTpsaMax) targets.tpsa = [parseFloat(optTpsaMin.value), parseFloat(optTpsaMax.value)];
+            if (optHbdMin && optHbdMax) targets.hbd = [parseInt(optHbdMin.value), parseInt(optHbdMax.value)];
+            if (optHbaMin && optHbaMax) targets.hba = [parseInt(optHbaMin.value), parseInt(optHbaMax.value)];
+
+            try {
+                const resp = await fetch("/optimize", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        targets: targets,
+                        method: optMethod ? optMethod.value : "gradient_ascent",
+                        n_candidates: parseInt(optCandidates ? optCandidates.value : 10),
+                        temperature: parseFloat(optTempInput ? optTempInput.value : 0.8)
+                    })
+                });
+
+                const data = await resp.json();
+                if (!resp.ok) throw new Error(data.detail || "Optimization failed");
+
+                data.candidates.forEach((mol, idx) => {
+                    const card = document.createElement("div");
+                    card.className = "gen-mol-card slide-up";
+                    const props = Object.entries(mol.properties || {})
+                        .map(([k, v]) => `<div style="font-size:0.7rem;color:#94a3b8;">${k}: ${typeof v === 'number' ? v.toFixed(1) : v}</div>`)
+                        .join('');
+
+                    card.innerHTML = `
+                        <span class="gen-badge gen-badge-valid">Score: ${mol.score.toFixed(1)}</span>
+                        <div class="analog-smiles" style="font-size: 0.8rem; color: white; margin: 0.5rem 0;">${mol.smiles}</div>
+                        <div style="margin-top: auto;">${props}</div>
+                        <button class="btn-primary" style="padding: 0.4rem; font-size: 0.7rem; margin-top: 0.5rem;"
+                                onclick="useGenerated('${mol.smiles}')">Predict Properties</button>
+                    `;
+                    optGrid.appendChild(card);
+                });
+
+                optStats.textContent = `Valid candidates: ${data.valid_count}/${data.total_attempts} attempts using ${data.method}`;
+                optResultsPanel.classList.remove("hidden");
+            } catch (err) {
+                alert(err.message);
+            } finally {
+                optLoading.classList.add("hidden");
+                optimizeBtn.disabled = false;
+            }
+        });
+    }
 
     // Examples dropdown -> populate input
     if (exampleSelect) {

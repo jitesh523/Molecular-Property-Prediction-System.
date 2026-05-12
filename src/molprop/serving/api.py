@@ -36,6 +36,7 @@ from molprop.features.descriptors import get_descriptor_names, smiles_to_descrip
 from molprop.features.fingerprints import smiles_to_maccs, tanimoto_similarity
 from molprop.features.graphs import smiles_to_graph
 from molprop.models.explain import explain_graph, get_explainer
+from molprop.models.optimization import LatentOptimizer
 from molprop.models.vae import SMILESVAE
 from molprop.models.visualize_explanations import get_explanation_image
 from molprop.serving.load_model import load_gnn_model
@@ -485,6 +486,96 @@ async def generate_status():
         "latent_dim": vae_state["model"].latent_dim if vae_state.get("model") else None,
         "vocab_size": len(vae_state["vocab"]) if vae_state.get("vocab") else None,
     }
+
+
+# ── Guided Molecular Optimization Endpoint ────────────────────────────────────
+
+
+class OptimizeRequest(BaseModel):
+    targets: dict[str, tuple[float, float]] = Field(
+        ...,
+        description="Property name -> (min, max) target ranges. Supported: mw, logp, tpsa, hbd, hba",
+    )
+    method: str = Field(
+        "gradient_ascent", description="Optimization method: gradient_ascent or random_walk"
+    )
+    n_candidates: int = Field(
+        10, ge=1, le=50, description="Number of candidate molecules to generate"
+    )
+    temperature: float = Field(0.8, ge=0.1, le=2.0, description="VAE sampling temperature")
+
+
+class OptimizedMolecule(BaseModel):
+    smiles: str
+    score: float
+    properties: dict[str, float]
+    latent_vector: list[float]
+
+
+class OptimizeResponse(BaseModel):
+    method: str
+    targets: dict[str, tuple[float, float]]
+    candidates: list[OptimizedMolecule]
+    total_attempts: int
+    valid_count: int
+
+
+@app.post("/optimize", response_model=OptimizeResponse, tags=["Generative Design"])
+async def optimize_molecules(req: OptimizeRequest):
+    """
+    Guided molecular optimization toward target property constraints.
+
+    Uses the trained VAE to navigate latent space and find molecules
+    matching desired property ranges (MW, LogP, TPSA, HBD, HBA).
+
+    Two methods available:
+    - gradient_ascent: Uses finite-difference gradients to optimize latent vectors
+    - random_walk: Samples and selects best matches (baseline)
+    """
+    if not vae_state.get("model"):
+        raise HTTPException(
+            status_code=503,
+            detail="VAE model not loaded. Train with `python scripts/train_vae.py` first.",
+        )
+
+    vae = vae_state["model"]
+    vocab = vae_state["vocab"]
+
+    optimizer = LatentOptimizer(
+        vae=vae,
+        vocab=vocab,
+        max_len=vae_state.get("max_len", 120),
+        device="cpu",
+    )
+
+    try:
+        results = optimizer.optimize(
+            targets=req.targets,
+            method=req.method,
+            n_candidates=req.n_candidates,
+            temperature=req.temperature,
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Optimization failed: {exc}") from exc
+
+    candidates = [
+        OptimizedMolecule(
+            smiles=r["smiles"],
+            score=r["score"],
+            properties=r["properties"],
+            latent_vector=r["z"],
+        )
+        for r in results
+        if r["smiles"]
+    ]
+
+    return OptimizeResponse(
+        method=req.method,
+        targets=req.targets,
+        candidates=candidates,
+        total_attempts=req.n_candidates * (50 if req.method == "gradient_ascent" else 10),
+        valid_count=len(candidates),
+    )
 
 
 # ── Descriptors Endpoint ──────────────────────────────────────────────────────

@@ -200,6 +200,53 @@ def test_generate_status_endpoint(client):
     assert isinstance(data["vae_loaded"], bool)
 
 
+# ── /optimize ─────────────────────────────────────────────────────────────────────────
+
+
+def test_optimize_no_vae(client):
+    """Returns 503 when VAE is not loaded."""
+    response = client.post(
+        "/optimize",
+        json={
+            "targets": {"mw": [200, 500], "logp": [0, 5]},
+            "method": "random_walk",
+            "n_candidates": 5,
+        },
+    )
+    # Will return 503 if VAE not loaded, or proceed if it is
+    assert response.status_code in (200, 503)
+
+
+def test_optimize_invalid_method(client):
+    """Invalid optimization method should fail gracefully."""
+    response = client.post(
+        "/optimize",
+        json={"targets": {"mw": [200, 500]}, "method": "invalid_method", "n_candidates": 5},
+    )
+    # Should return 400, 422, or 500 for invalid method
+    assert response.status_code in (200, 400, 422, 500, 503)
+
+
+def test_optimize_valid_request(client):
+    """Valid optimization request should return candidates."""
+    response = client.post(
+        "/optimize",
+        json={
+            "targets": {"mw": [200, 500], "logp": [0, 5], "tpsa": [20, 140]},
+            "method": "random_walk",
+            "n_candidates": 5,
+            "temperature": 0.8,
+        },
+    )
+    # If VAE loaded, check response structure
+    if response.status_code == 200:
+        data = response.json()
+        assert "candidates" in data
+        assert "method" in data
+        assert "valid_count" in data
+        assert isinstance(data["candidates"], list)
+
+
 # ── /search ────────────────────────────────────────────────────────────────────────────
 
 

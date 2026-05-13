@@ -494,7 +494,7 @@ async def generate_status():
 class OptimizeRequest(BaseModel):
     targets: dict[str, tuple[float, float]] = Field(
         ...,
-        description="Property name -> (min, max) target ranges. Supported: mw, logp, tpsa, hbd, hba",
+        description="Property name -> (min, max) target ranges. Supported: mw, logp, tpsa, hbd, hba, qed, sas",
     )
     method: str = Field(
         "gradient_ascent", description="Optimization method: gradient_ascent or random_walk"
@@ -503,6 +503,11 @@ class OptimizeRequest(BaseModel):
         10, ge=1, le=50, description="Number of candidate molecules to generate"
     )
     temperature: float = Field(0.8, ge=0.1, le=2.0, description="VAE sampling temperature")
+    seed_smiles: str | None = Field(
+        None,
+        max_length=MAX_SMILES_LEN,
+        description="Optional seed molecule to start optimization from",
+    )
 
 
 class OptimizedMolecule(BaseModel):
@@ -526,7 +531,9 @@ async def optimize_molecules(req: OptimizeRequest):
     Guided molecular optimization toward target property constraints.
 
     Uses the trained VAE to navigate latent space and find molecules
-    matching desired property ranges (MW, LogP, TPSA, HBD, HBA).
+    matching desired property ranges (MW, LogP, TPSA, HBD, HBA, QED, SAS).
+
+    Supports starting from a seed molecule to explore its chemical neighborhood.
 
     Two methods available:
     - gradient_ascent: Uses finite-difference gradients to optimize latent vectors
@@ -554,6 +561,7 @@ async def optimize_molecules(req: OptimizeRequest):
             method=req.method,
             n_candidates=req.n_candidates,
             temperature=req.temperature,
+            seed_smiles=req.seed_smiles,
         )
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Optimization failed: {exc}") from exc

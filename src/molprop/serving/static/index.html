@@ -231,8 +231,31 @@
                                 <input type="number" id="opt-hba-max" value="10" placeholder="Max">
                             </div>
                         </div>
+                        <div class="control-group range-control">
+                            <label>QED (Drug-likeness) <span class="hint">(0.0-1.0, higher is better)</span></label>
+                            <div class="range-inputs">
+                                <input type="number" id="opt-qed-min" value="0.5" placeholder="Min" min="0" max="1" step="0.05">
+                                <span>—</span>
+                                <input type="number" id="opt-qed-max" value="1.0" placeholder="Max" min="0" max="1" step="0.05">
+                            </div>
+                        </div>
+                        <div class="control-group range-control">
+                            <label>SAS (Synthesis Ease) <span class="hint">(1.0-10.0, lower is easier)</span></label>
+                            <div class="range-inputs">
+                                <input type="number" id="opt-sas-min" value="1.0" placeholder="Min" min="1" max="10" step="0.5">
+                                <span>—</span>
+                                <input type="number" id="opt-sas-max" value="5.0" placeholder="Max" min="1" max="10" step="0.5">
+                            </div>
+                        </div>
 
                         <div class="control-group" style="margin-top: 1.5rem;">
+                            <label for="opt-seed">Seed Molecule (Optional)
+                                <span class="hint">SMILES to start optimization from</span>
+                            </label>
+                            <input type="text" id="opt-seed" placeholder="e.g., c1ccccc1 (leave empty for random start)">
+                        </div>
+
+                        <div class="control-group">
                             <label for="opt-method">Optimization Method</label>
                             <select id="opt-method">
                                 <option value="gradient_ascent">Gradient Ascent (Recommended)</option>
@@ -265,7 +288,12 @@
                 <section id="optimize-results-panel" class="hidden">
                     <div class="gen-header glass-panel slide-up">
                         <h3 class="section-title">🎯 Optimized Structures</h3>
-                        <div id="optimize-stats" class="gen-stats"></div>
+                        <div style="display: flex; gap: 1rem; align-items: center;">
+                            <div id="optimize-stats" class="gen-stats"></div>
+                            <button id="opt-export-csv" class="btn-secondary" style="padding: 0.5rem 1rem; font-size: 0.85rem;">
+                                📥 Export CSV
+                            </button>
+                        </div>
                     </div>
                     <div id="optimize-grid" class="generated-grid"></div>
                 </section>

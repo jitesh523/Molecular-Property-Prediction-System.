@@ -53,6 +53,15 @@ document.addEventListener("DOMContentLoaded", () => {
     const optHbdMax = document.getElementById("opt-hbd-max");
     const optHbaMin = document.getElementById("opt-hba-min");
     const optHbaMax = document.getElementById("opt-hba-max");
+    const optQedMin = document.getElementById("opt-qed-min");
+    const optQedMax = document.getElementById("opt-qed-max");
+    const optSasMin = document.getElementById("opt-sas-min");
+    const optSasMax = document.getElementById("opt-sas-max");
+    const optSeed = document.getElementById("opt-seed");
+    const optExportCsv = document.getElementById("opt-export-csv");
+
+    // Store last optimization results for CSV export
+    let lastOptimizeResults = [];
 
     // ── Elements: Global ─────────────────────────────────────────────────────
     const appTitle = document.getElementById("app-title");
@@ -259,6 +268,10 @@ document.addEventListener("DOMContentLoaded", () => {
             if (optTpsaMin && optTpsaMax) targets.tpsa = [parseFloat(optTpsaMin.value), parseFloat(optTpsaMax.value)];
             if (optHbdMin && optHbdMax) targets.hbd = [parseInt(optHbdMin.value), parseInt(optHbdMax.value)];
             if (optHbaMin && optHbaMax) targets.hba = [parseInt(optHbaMin.value), parseInt(optHbaMax.value)];
+            if (optQedMin && optQedMax) targets.qed = [parseFloat(optQedMin.value), parseFloat(optQedMax.value)];
+            if (optSasMin && optSasMax) targets.sas = [parseFloat(optSasMin.value), parseFloat(optSasMax.value)];
+
+            const seedValue = optSeed && optSeed.value.trim() ? optSeed.value.trim() : null;
 
             try {
                 const resp = await fetch("/optimize", {
@@ -268,18 +281,22 @@ document.addEventListener("DOMContentLoaded", () => {
                         targets: targets,
                         method: optMethod ? optMethod.value : "gradient_ascent",
                         n_candidates: parseInt(optCandidates ? optCandidates.value : 10),
-                        temperature: parseFloat(optTempInput ? optTempInput.value : 0.8)
+                        temperature: parseFloat(optTempInput ? optTempInput.value : 0.8),
+                        seed_smiles: seedValue
                     })
                 });
 
                 const data = await resp.json();
                 if (!resp.ok) throw new Error(data.detail || "Optimization failed");
 
+                // Store results for CSV export
+                lastOptimizeResults = data.candidates || [];
+
                 data.candidates.forEach((mol, idx) => {
                     const card = document.createElement("div");
                     card.className = "gen-mol-card slide-up";
                     const props = Object.entries(mol.properties || {})
-                        .map(([k, v]) => `<div style="font-size:0.7rem;color:#94a3b8;">${k}: ${typeof v === 'number' ? v.toFixed(1) : v}</div>`)
+                        .map(([k, v]) => `<div style="font-size:0.7rem;color:#94a3b8;">${k}: ${typeof v === 'number' ? v.toFixed(2) : v}</div>`)
                         .join('');
 
                     card.innerHTML = `
@@ -292,7 +309,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     optGrid.appendChild(card);
                 });
 
-                optStats.textContent = `Valid candidates: ${data.valid_count}/${data.total_attempts} attempts using ${data.method}`;
+                optStats.textContent = `Valid: ${data.valid_count}/${data.total_attempts} via ${data.method}${seedValue ? ' (seeded)' : ''}`;
                 optResultsPanel.classList.remove("hidden");
             } catch (err) {
                 alert(err.message);
@@ -300,6 +317,39 @@ document.addEventListener("DOMContentLoaded", () => {
                 optLoading.classList.add("hidden");
                 optimizeBtn.disabled = false;
             }
+        });
+    }
+
+    // ── CSV Export ─────────────────────────────────────────────────────────
+    if (optExportCsv) {
+        optExportCsv.addEventListener("click", () => {
+            if (!lastOptimizeResults.length) {
+                alert("No optimization results to export");
+                return;
+            }
+
+            // Build CSV
+            const headers = ["SMILES", "Score", "MW", "LogP", "TPSA", "HBD", "HBA", "QED", "SAS"];
+            const rows = lastOptimizeResults.map(mol => [
+                mol.smiles,
+                mol.score.toFixed(4),
+                mol.properties?.mw?.toFixed(2) || "",
+                mol.properties?.logp?.toFixed(2) || "",
+                mol.properties?.tpsa?.toFixed(2) || "",
+                mol.properties?.hbd?.toFixed(0) || "",
+                mol.properties?.hba?.toFixed(0) || "",
+                mol.properties?.qed?.toFixed(4) || "",
+                mol.properties?.sas?.toFixed(2) || ""
+            ]);
+
+            const csv = [headers.join(","), ...rows.map(r => r.join(","))].join("\n");
+            const blob = new Blob([csv], { type: "text/csv" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = `optimized_molecules_${new Date().toISOString().slice(0, 10)}.csv`;
+            a.click();
+            URL.revokeObjectURL(url);
         });
     }
 

@@ -16,6 +16,34 @@ from rdkit.Chem import Descriptors, Lipinski
 from molprop.data.standardize import standardize_smiles
 
 
+def compute_qed(smiles: str) -> float | None:
+    """Compute QED (drug-likeness) score using RDKit."""
+    from rdkit.Chem import QED
+
+    mol = Chem.MolFromSmiles(smiles)
+    if mol is None:
+        return None
+    return QED.qed(mol)
+
+
+def compute_sas(smiles: str) -> float | None:
+    """Compute synthetic accessibility score (SAS) using RDKit."""
+
+    mol = Chem.MolFromSmiles(smiles)
+    if mol is None:
+        return None
+
+    # SAScore based on fragment contributions - simplified version
+    # Full implementation requires SA_Score module, fallback to ring complexity
+    n_rings = Lipinski.RingCount(mol)
+    n_rot = Lipinski.NumRotatableBonds(mol)
+    n_stereo = len(Chem.FindMolChiralCenters(mol))
+
+    # Simple heuristic: more rings + rotatable bonds + chiral centers = harder to synthesize
+    sas = 1.0 + 0.2 * n_rings + 0.1 * n_rot + 0.3 * n_stereo
+    return min(sas, 10.0)  # Cap at 10
+
+
 class LatentOptimizer:
     """
     Optimize molecular properties by traversing the VAE latent space.
@@ -137,11 +165,44 @@ class LatentOptimizer:
             elif props["hba"] > max_v:
                 penalties += (props["hba"] - max_v) ** 2
 
+        # Drug-likeness (QED) - 0.0 to 1.0, higher is better
+        if "qed" in targets or "QED" in targets:
+            key = "qed" if "qed" in targets else "QED"
+            props["qed"] = compute_qed(smiles) or 0.0
+            min_v, max_v = targets[key]
+            if props["qed"] < min_v:
+                penalties += (min_v - props["qed"]) ** 2 * 100  # Weight heavily
+            elif props["qed"] > max_v:
+                penalties += (props["qed"] - max_v) ** 2 * 100
+
+        # Synthetic Accessibility Score (SAS) - 1.0 to 10.0, lower is better (easier to make)
+        if "sas" in targets or "SAS" in targets:
+            key = "sas" if "sas" in targets else "SAS"
+            props["sas"] = compute_sas(smiles) or 10.0
+            min_v, max_v = targets[key]
+            if props["sas"] < min_v:
+                penalties += (min_v - props["sas"]) ** 2
+            elif props["sas"] > max_v:
+                penalties += (props["sas"] - max_v) ** 2 * 2  # Penalize high SAS more
+
         # GNN predictor (if available)
-        if self.predictor and any(
-            k not in ("mw", "MW", "logp", "LogP", "tpsa", "TPSA", "hbd", "HBD", "hba", "HBA")
-            for k in targets
-        ):
+        builtin_props = (
+            "mw",
+            "MW",
+            "logp",
+            "LogP",
+            "tpsa",
+            "TPSA",
+            "hbd",
+            "HBD",
+            "hba",
+            "HBA",
+            "qed",
+            "QED",
+            "sas",
+            "SAS",
+        )
+        if self.predictor and any(k not in builtin_props for k in targets):
             pred = self.predictor(smiles)
             for key, (min_v, max_v) in targets.items():
                 if key in pred:
@@ -155,6 +216,24 @@ class LatentOptimizer:
         score = -penalties
         return score, props
 
+    def encode_seed(self, smiles: str) -> torch.Tensor | None:
+        """Encode a seed SMILES string to a latent vector using the VAE."""
+
+        std_smiles = standardize_smiles(smiles)
+        if not std_smiles:
+            return None
+
+        try:
+            tokens = self.vocab.encode(std_smiles, max_len=self.max_len)
+            x = torch.tensor([tokens], dtype=torch.long, device=self.device)
+            with torch.no_grad():
+                mu, logvar = self.vae.encode(x)
+                # Use mean (mu) as the latent representation
+                z = self.vae.reparameterize(mu, logvar)
+            return z
+        except Exception:
+            return None
+
     def optimize_gradient_ascent(
         self,
         targets: dict[str, tuple[float, float]],
@@ -163,6 +242,7 @@ class LatentOptimizer:
         lr: float = 0.1,
         noise_scale: float = 0.5,
         temperature: float = 0.8,
+        seed_smiles: str | None = None,
     ) -> list[dict]:
         """
         Gradient-guided optimization in latent space.
@@ -170,14 +250,27 @@ class LatentOptimizer:
         Uses finite-difference gradients to navigate toward molecules
         with desired properties.
 
+        Args:
+            seed_smiles: Optional seed molecule to start optimization from.
+                        If None, starts from random latent vectors.
+
         Returns:
             List of dicts with "smiles", "score", "properties", "z".
         """
         results = []
 
+        # Encode seed molecule if provided
+        seed_z = None
+        if seed_smiles:
+            seed_z = self.encode_seed(seed_smiles)
+
         for _ in range(n_candidates):
-            # Start from random point in latent space
-            z = torch.randn(1, self.latent_dim, device=self.device, requires_grad=False)
+            # Start from seed or random point in latent space
+            if seed_z is not None:
+                # Add small noise to seed for diversity
+                z = seed_z + torch.randn_like(seed_z) * 0.5
+            else:
+                z = torch.randn(1, self.latent_dim, device=self.device, requires_grad=False)
             best_z = z.clone()
             best_score = float("-inf")
 
@@ -230,19 +323,35 @@ class LatentOptimizer:
         n_samples: int = 100,
         n_top: int = 10,
         temperature: float = 0.8,
+        seed_smiles: str | None = None,
     ) -> list[dict]:
         """
         Sample latent space and select best matches (baseline comparison).
+
+        Args:
+            seed_smiles: Optional seed molecule to bias sampling toward.
 
         Returns:
             List of top-n dicts with "smiles", "score", "properties", "z".
         """
         results = []
 
+        # Encode seed if provided
+        seed_z = None
+        if seed_smiles:
+            seed_z = self.encode_seed(seed_smiles)
+
         # Batch decoding for efficiency
         batch_size = 20
         for _ in range(n_samples // batch_size):
-            z = torch.randn(batch_size, self.latent_dim, device=self.device)
+            if seed_z is not None:
+                # Sample around seed with increasing variance
+                z = (
+                    seed_z.repeat(batch_size, 1)
+                    + torch.randn(batch_size, self.latent_dim, device=self.device) * 1.5
+                )
+            else:
+                z = torch.randn(batch_size, self.latent_dim, device=self.device)
             smiles_list = self.decode_smiles(z, temperature=temperature)
 
             for smi, vec in zip(smiles_list, z, strict=False):
@@ -266,6 +375,7 @@ class LatentOptimizer:
         method: str = "gradient_ascent",
         n_candidates: int = 10,
         temperature: float = 0.8,
+        seed_smiles: str | None = None,
     ) -> list[dict]:
         """
         Main entry point for optimization.
@@ -275,17 +385,22 @@ class LatentOptimizer:
             method: "gradient_ascent" or "random_walk".
             n_candidates: Number of optimization runs.
             temperature: VAE decoding temperature.
+            seed_smiles: Optional seed molecule to start from.
 
         Returns:
             Ranked list of optimized molecules.
         """
         if method == "gradient_ascent":
             return self.optimize_gradient_ascent(
-                targets, n_candidates=n_candidates, temperature=temperature
+                targets, n_candidates=n_candidates, temperature=temperature, seed_smiles=seed_smiles
             )
         elif method == "random_walk":
             return self.optimize_random_walk(
-                targets, n_samples=n_candidates * 10, n_top=n_candidates, temperature=temperature
+                targets,
+                n_samples=n_candidates * 10,
+                n_top=n_candidates,
+                temperature=temperature,
+                seed_smiles=seed_smiles,
             )
         else:
             raise ValueError(f"Unknown optimization method: {method}")

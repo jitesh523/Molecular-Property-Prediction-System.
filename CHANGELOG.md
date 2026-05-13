@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.9.0] - 2026-05-13
+
+### Added
+- **QED (Drug-likeness) and SAS (Synthetic Accessibility)** property targets for optimization.
+  - QED: 0.0-1.0 scale, higher is more drug-like (RDKit-based).
+  - SAS: 1.0-10.0 scale, lower is easier to synthesize.
+- **Seed molecule support** — start optimization from a known molecule using its SMILES string.
+  - `seed_smiles` parameter in `POST /optimize` request.
+  - VAE encodes the seed to latent space and explores nearby regions.
+- **CSV export** in the UI — download optimized molecules as CSV with all computed properties.
+- UI enhancements:
+  - Property range inputs for QED and SAS with helpful hints.
+  - Seed molecule input field with placeholder example.
+  - Export button in optimization results panel.
+
+### Changed
+- `LatentOptimizer.optimize()` now accepts optional `seed_smiles` parameter.
+- Both `gradient_ascent` and `random_walk` methods support seed-based optimization.
+
 ## [1.8.0] - 2026-05-12
 
 ### Added

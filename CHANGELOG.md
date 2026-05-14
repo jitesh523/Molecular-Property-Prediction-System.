@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.2.0] - 2026-05-14
+
+### Added
+- **🌐 Latent Space Explorer tab** — interactive PCA 2D projection of the VAE latent space.
+  - `POST /latent_map` endpoint: samples molecules, encodes to latent space, projects to 2D via PCA (no extra dependencies).
+  - Canvas scatter plot colored by QED — purple (low) → green (high).
+  - Hover tooltip shows QED, MW, and SMILES.
+  - Click any dot to select and decode the molecule.
+  - Selected molecule can be sent directly to Predict or Optimize tabs.
+  - Optional seed SMILES highlighted with ⭐ on the map.
+- `LatentMapRequest`, `LatentMapPoint` models in API.
+
 ## [2.1.0] - 2026-05-14
 
 ### Added

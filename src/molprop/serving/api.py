@@ -688,6 +688,118 @@ async def optimize_pareto(req: ParetoRequest):
     )
 
 
+# ── Latent Space Map Endpoint ─────────────────────────────────────────────────
+
+
+class LatentMapRequest(BaseModel):
+    n_samples: int = Field(
+        300, ge=50, le=2000, description="Number of molecules to sample for the map"
+    )
+    temperature: float = Field(0.8, ge=0.1, le=2.0, description="VAE sampling temperature")
+    seed_smiles: str | None = Field(
+        None, max_length=MAX_SMILES_LEN, description="Optional seed molecule to highlight"
+    )
+
+
+class LatentMapPoint(BaseModel):
+    x: float
+    y: float
+    smiles: str
+    qed: float
+    mw: float
+    is_seed: bool = False
+
+
+@app.post("/latent_map", tags=["Generative Design"])
+async def latent_map(req: LatentMapRequest):
+    """
+    Generate a 2D projection of the VAE latent space using PCA.
+
+    Samples molecules, computes their latent vectors, projects to 2D,
+    and returns coordinates colored by QED drug-likeness.
+    Optional seed molecule is highlighted in the projection.
+    """
+    if not vae_state.get("model"):
+        raise HTTPException(
+            status_code=503,
+            detail="VAE model not loaded. Train with `python scripts/train_vae.py` first.",
+        )
+
+    from molprop.models.optimization import LatentOptimizer, compute_qed, smiles_to_properties
+
+    vae = vae_state["model"]
+    vocab = vae_state["vocab"]
+    max_len = vae_state.get("max_len", 120)
+
+    lat_opt = LatentOptimizer(vae=vae, vocab=vocab, max_len=max_len, device="cpu")
+
+    # Sample latent vectors
+    batch_size = 50
+    all_z = []
+    all_smiles = []
+
+    with torch.no_grad():
+        for _ in range(req.n_samples // batch_size):
+            z = torch.randn(batch_size, vae.latent_dim)
+            smiles_list = lat_opt.decode_smiles(z, temperature=req.temperature)
+            for smi, vec in zip(smiles_list, z, strict=False):
+                if smi:
+                    all_z.append(vec.cpu().numpy())
+                    all_smiles.append(smi)
+
+    # Optionally encode the seed
+    seed_z_np = None
+    seed_smi = None
+    if req.seed_smiles:
+        seed_tensor = lat_opt.encode_seed(req.seed_smiles)
+        if seed_tensor is not None:
+            seed_z_np = seed_tensor.squeeze(0).cpu().numpy()
+            seed_smi = req.seed_smiles
+            all_z.append(seed_z_np)
+            all_smiles.append(seed_smi)
+
+    if len(all_z) < 5:
+        raise HTTPException(
+            status_code=500, detail="Could not decode enough valid molecules for the map."
+        )
+
+    import numpy as np
+
+    Z = np.array(all_z)
+
+    # PCA to 2D (no external dependency — always available)
+    Z_centered = Z - Z.mean(axis=0)
+    cov = np.cov(Z_centered.T)
+    eigenvalues, eigenvectors = np.linalg.eigh(cov)
+    # Take top-2 eigenvectors (largest eigenvalues)
+    idx = np.argsort(eigenvalues)[::-1]
+    pcs = eigenvectors[:, idx[:2]]
+    Z_2d = Z_centered @ pcs
+
+    points = []
+    for _i, (smi, coords) in enumerate(zip(all_smiles, Z_2d, strict=False)):
+        props = smiles_to_properties(smi) or {}
+        qed_val = compute_qed(smi) or 0.0
+        is_seed = seed_smi is not None and smi == seed_smi
+        points.append(
+            LatentMapPoint(
+                x=float(coords[0]),
+                y=float(coords[1]),
+                smiles=smi,
+                qed=round(qed_val, 4),
+                mw=round(float(props.get("mw", 0.0)), 2),
+                is_seed=is_seed,
+            )
+        )
+
+    return {
+        "points": [p.model_dump() for p in points],
+        "total": len(points),
+        "projection": "PCA",
+        "color_by": "qed",
+    }
+
+
 # ── Descriptors Endpoint ──────────────────────────────────────────────────────
 
 

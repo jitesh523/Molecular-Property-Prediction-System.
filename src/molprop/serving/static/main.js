@@ -169,6 +169,207 @@ document.addEventListener("DOMContentLoaded", () => {
     // Render on history tab click
     document.querySelector('[data-tab="history"]')?.addEventListener("click", renderHistory);
 
+    // ── Elements: Visualize Tab ──────────────────────────────────────────────
+    const vizBtn = document.getElementById("viz-btn");
+    const vizCanvas = document.getElementById("viz-canvas");
+    const vizResults = document.getElementById("viz-results");
+    const vizStats = document.getElementById("viz-stats");
+    const vizTooltip = document.getElementById("viz-tooltip");
+    const vizSelected = document.getElementById("viz-selected");
+    const vizSelectedSmiles = document.getElementById("viz-selected-smiles");
+    const vizSelectedProps = document.getElementById("viz-selected-props");
+    const vizPredictBtn = document.getElementById("viz-predict-btn");
+    const vizOptimizeBtn = document.getElementById("viz-optimize-btn");
+    const vizSamplesInput = document.getElementById("viz-samples");
+    const vizTempInput = document.getElementById("viz-temperature");
+    const vizSeedInput = document.getElementById("viz-seed");
+
+    let vizPoints = [];  // raw points from API
+    let vizSelectedPoint = null;
+
+    // Helper: map QED 0→1 to a color (purple → green)
+    function qedColor(qed) {
+        const r = Math.round(99 + (16 - 99) * qed);
+        const g = Math.round(102 + (185 - 102) * qed);
+        const b = Math.round(241 + (129 - 241) * qed);
+        return `rgb(${r},${g},${b})`;
+    }
+
+    // Helper: project points to canvas pixel coords
+    function projectPoints(points, canvas) {
+        if (!points.length) return [];
+        const xs = points.map(p => p.x);
+        const ys = points.map(p => p.y);
+        const xMin = Math.min(...xs), xMax = Math.max(...xs);
+        const yMin = Math.min(...ys), yMax = Math.max(...ys);
+        const pad = 40;
+        const W = canvas.width, H = canvas.height;
+        return points.map(p => ({
+            ...p,
+            px: pad + (p.x - xMin) / (xMax - xMin + 1e-9) * (W - 2 * pad),
+            py: H - pad - (p.y - yMin) / (yMax - yMin + 1e-9) * (H - 2 * pad),
+        }));
+    }
+
+    function drawVizCanvas(projected) {
+        if (!vizCanvas) return;
+        const ctx = vizCanvas.getContext("2d");
+        ctx.clearRect(0, 0, vizCanvas.width, vizCanvas.height);
+
+        // Draw regular points first, seeds last
+        const regular = projected.filter(p => !p.is_seed);
+        const seeds = projected.filter(p => p.is_seed);
+
+        for (const p of regular) {
+            ctx.beginPath();
+            ctx.arc(p.px, p.py, 5, 0, Math.PI * 2);
+            ctx.fillStyle = qedColor(p.qed);
+            ctx.globalAlpha = 0.75;
+            ctx.fill();
+        }
+
+        // Highlight selected
+        if (vizSelectedPoint) {
+            ctx.beginPath();
+            ctx.arc(vizSelectedPoint.px, vizSelectedPoint.py, 8, 0, Math.PI * 2);
+            ctx.fillStyle = "#fbbf24";
+            ctx.globalAlpha = 1;
+            ctx.fill();
+            ctx.strokeStyle = "#fff";
+            ctx.lineWidth = 2;
+            ctx.stroke();
+        }
+
+        // Draw seed stars
+        for (const p of seeds) {
+            ctx.globalAlpha = 1;
+            ctx.font = "18px serif";
+            ctx.fillText("⭐", p.px - 9, p.py + 7);
+        }
+
+        ctx.globalAlpha = 1;
+    }
+
+    function findNearestPoint(projected, mx, my, threshold = 12) {
+        let best = null, bestDist = Infinity;
+        for (const p of projected) {
+            const d = Math.hypot(p.px - mx, p.py - my);
+            if (d < threshold && d < bestDist) { best = p; bestDist = d; }
+        }
+        return best;
+    }
+
+    // ── Action: Generate Map ─────────────────────────────────────────────────
+    if (vizBtn) {
+        vizBtn.addEventListener("click", async () => {
+            vizBtn.disabled = true;
+            vizBtn.textContent = "⏳ Computing…";
+            vizResults.classList.add("hidden");
+
+            try {
+                const resp = await fetch("/latent_map", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        n_samples: parseInt(vizSamplesInput?.value || 300),
+                        temperature: parseFloat(vizTempInput?.value || 0.8),
+                        seed_smiles: vizSeedInput?.value.trim() || null
+                    })
+                });
+                const data = await resp.json();
+                if (!resp.ok) throw new Error(data.detail || "Latent map failed");
+
+                vizPoints = projectPoints(data.points, vizCanvas);
+                drawVizCanvas(vizPoints);
+                vizStats.textContent = `${data.total} molecules • PCA projection • colored by QED`;
+                vizResults.classList.remove("hidden");
+            } catch (err) {
+                alert(err.message);
+            } finally {
+                vizBtn.disabled = false;
+                vizBtn.textContent = "🌐 Generate Map";
+            }
+        });
+    }
+
+    // ── Visualize: hover tooltip ─────────────────────────────────────────────
+    if (vizCanvas) {
+        vizCanvas.addEventListener("mousemove", (e) => {
+            const rect = vizCanvas.getBoundingClientRect();
+            const scaleX = vizCanvas.width / rect.width;
+            const scaleY = vizCanvas.height / rect.height;
+            const mx = (e.clientX - rect.left) * scaleX;
+            const my = (e.clientY - rect.top) * scaleY;
+
+            const nearest = findNearestPoint(vizPoints, mx, my, 14);
+            if (nearest) {
+                vizTooltip.classList.remove("hidden");
+                vizTooltip.style.left = (e.clientX + 14) + "px";
+                vizTooltip.style.top = (e.clientY - 10) + "px";
+                vizTooltip.innerHTML = `
+                    <div style="font-weight:600;color:#e2e8f0;margin-bottom:0.3rem;">QED: ${nearest.qed.toFixed(3)}</div>
+                    <div style="color:#94a3b8;font-size:0.75rem;">MW: ${nearest.mw.toFixed(1)}</div>
+                    <div style="font-family:monospace;font-size:0.72rem;color:#cbd5e1;margin-top:0.3rem;word-break:break-all;">${nearest.smiles}</div>
+                `;
+                vizCanvas.style.cursor = "pointer";
+            } else {
+                vizTooltip.classList.add("hidden");
+                vizCanvas.style.cursor = "crosshair";
+            }
+        });
+
+        vizCanvas.addEventListener("mouseleave", () => {
+            vizTooltip.classList.add("hidden");
+        });
+
+        // ── Visualize: click to select ────────────────────────────────────────
+        vizCanvas.addEventListener("click", (e) => {
+            const rect = vizCanvas.getBoundingClientRect();
+            const scaleX = vizCanvas.width / rect.width;
+            const scaleY = vizCanvas.height / rect.height;
+            const mx = (e.clientX - rect.left) * scaleX;
+            const my = (e.clientY - rect.top) * scaleY;
+
+            const nearest = findNearestPoint(vizPoints, mx, my, 14);
+            if (nearest) {
+                vizSelectedPoint = nearest;
+                drawVizCanvas(vizPoints);
+                vizSelectedSmiles.textContent = nearest.smiles;
+                vizSelectedProps.innerHTML = `
+                    <span class="history-prop-chip">QED: ${nearest.qed.toFixed(3)}</span>
+                    <span class="history-prop-chip">MW: ${nearest.mw.toFixed(1)}</span>
+                `;
+                vizSelected.classList.remove("hidden");
+            }
+        });
+    }
+
+    // ── Visualize: selected mol actions ────────────────────────────────────
+    if (vizPredictBtn) {
+        vizPredictBtn.addEventListener("click", () => {
+            if (vizSelectedPoint) {
+                smilesInput.value = vizSelectedPoint.smiles;
+                document.querySelector('[data-tab="predict"]').click();
+                predictBtn.click();
+            }
+        });
+    }
+
+    if (vizOptimizeBtn) {
+        vizOptimizeBtn.addEventListener("click", () => {
+            if (vizSelectedPoint) {
+                if (optSeed) optSeed.value = vizSelectedPoint.smiles;
+                document.querySelector('[data-tab="optimize"]').click();
+                if (optSeed) optSeed.scrollIntoView({ behavior: "smooth", block: "center" });
+            }
+        });
+    }
+
+    // Enable viz button when VAE is loaded
+    document.addEventListener("vae-ready", () => {
+        if (vizBtn) vizBtn.disabled = false;
+    });
+
     // ── Elements: Global ─────────────────────────────────────────────────────
     const appTitle = document.getElementById("app-title");
     const badgeModel = document.getElementById("badge-model");
@@ -222,6 +423,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 }
                 if (optimizeBtn) optimizeBtn.disabled = false;
                 if (paretoBtn) paretoBtn.disabled = false;
+                if (vizBtn) vizBtn.disabled = false;
             } else {
                 badgeVae.textContent = "VAE Inactive";
                 badgeVae.style.opacity = "0.5";

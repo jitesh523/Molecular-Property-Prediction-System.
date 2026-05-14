@@ -37,6 +37,9 @@
             <button class="tab-btn" data-tab="history">
                 <span class="tab-icon">📋</span> History
             </button>
+            <button class="tab-btn" data-tab="visualize">
+                <span class="tab-icon">🌐</span> Visualize
+            </button>
         </nav>
 
         <main>
@@ -345,6 +348,61 @@
                     <div id="pareto-grid" class="generated-grid"></div>
                 </section>
 
+            </section>
+
+            <!-- ══════════════════════════════════════════════════════════════
+                 TAB 5 – VISUALIZE
+            ══════════════════════════════════════════════════════════════ -->
+            <section id="tab-visualize" class="tab-panel hidden">
+                <div class="input-section glass-panel fade-in slide-up">
+                    <h2>🌐 Latent Space Explorer</h2>
+                    <p class="section-desc">PCA projection of the VAE latent space. Each dot is a decoded molecule, colored by QED drug-likeness. Click any dot to decode it.</p>
+                    <div style="display: flex; gap: 1.5rem; flex-wrap: wrap; align-items: flex-end; margin-top: 1rem;">
+                        <div class="control-group" style="margin:0;min-width:160px;">
+                            <label for="viz-samples">Molecules to sample</label>
+                            <input type="number" id="viz-samples" value="300" min="50" max="2000" step="50">
+                        </div>
+                        <div class="control-group" style="margin:0;min-width:160px;">
+                            <label for="viz-temperature">Temperature</label>
+                            <input type="number" id="viz-temperature" value="0.8" min="0.1" max="2.0" step="0.05">
+                        </div>
+                        <div class="control-group" style="margin:0;flex:1;min-width:200px;">
+                            <label for="viz-seed">Highlight Seed (optional)</label>
+                            <input type="text" id="viz-seed" placeholder="Enter SMILES to highlight...">
+                        </div>
+                        <button id="viz-btn" class="btn-primary" disabled style="padding:0.6rem 1.5rem;">
+                            🌐 Generate Map
+                        </button>
+                    </div>
+                </div>
+
+                <div id="viz-results" class="hidden">
+                    <div class="glass-panel slide-up" style="padding: 1.5rem; margin-top: 1rem;">
+                        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:1rem; margin-bottom:1rem;">
+                            <div>
+                                <span id="viz-stats" class="gen-stats"></span>
+                            </div>
+                            <div style="display:flex; gap:0.5rem; align-items:center; font-size:0.8rem; color:var(--text-muted);">
+                                <span>🟣 Low QED</span>
+                                <div style="width:80px;height:8px;border-radius:4px;background:linear-gradient(to right,#6366f1,#10b981);"></div>
+                                <span>🟢 High QED</span>
+                                <span style="margin-left:1rem;">⭐ = Seed</span>
+                            </div>
+                        </div>
+                        <canvas id="viz-canvas" width="900" height="500"
+                                style="width:100%;border-radius:8px;cursor:crosshair;background:rgba(0,0,0,0.2);"></canvas>
+                    </div>
+                    <div id="viz-tooltip" class="glass-panel hidden"
+                         style="position:fixed;padding:0.75rem 1rem;font-size:0.8rem;pointer-events:none;z-index:999;max-width:300px;">
+                    </div>
+                    <div id="viz-selected" class="glass-panel hidden slide-up" style="margin-top:1rem; padding:1.25rem;">
+                        <h3 style="margin-bottom:0.75rem;">💡 Selected Molecule</h3>
+                        <div id="viz-selected-smiles" class="analog-smiles" style="font-size:0.9rem;color:white;margin-bottom:0.75rem;"></div>
+                        <div id="viz-selected-props" class="history-props" style="margin-bottom:0.75rem;"></div>
+                        <button id="viz-predict-btn" class="btn-primary" style="padding:0.4rem 1rem;font-size:0.85rem;">Predict Properties</button>
+                        <button id="viz-optimize-btn" class="btn-secondary" style="padding:0.4rem 1rem;font-size:0.85rem;margin-left:0.5rem;">Optimize from Here</button>
+                    </div>
+                </div>
             </section>
 
             <!-- ══════════════════════════════════════════════════════════════

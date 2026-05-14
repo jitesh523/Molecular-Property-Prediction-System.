@@ -40,6 +40,9 @@
             <button class="tab-btn" data-tab="visualize">
                 <span class="tab-icon">🌐</span> Visualize
             </button>
+            <button class="tab-btn" data-tab="admet">
+                <span class="tab-icon">🧪</span> ADMET
+            </button>
         </nav>
 
         <main>
@@ -435,6 +438,55 @@
                 <!-- History list -->
                 <div id="history-list" style="display: flex; flex-direction: column; gap: 0.75rem; margin-top: 1rem;"></div>
             </section>
+
+            <!-- ══════════════════════════════════════════════════════════════
+                 TAB 6 – ADMET
+            ══════════════════════════════════════════════════════════════ -->
+            <section id="tab-admet" class="tab-panel hidden">
+                <div class="input-section glass-panel fade-in slide-up">
+                    <h2>🧪 ADMET Analysis</h2>
+                    <p class="section-desc">Assess Absorption, Distribution, Metabolism, Excretion &amp; Toxicity using RDKit rule-based filters, PAINS/Brenk structural alerts, and medicinal chemistry rules.</p>
+                    <div style="display: flex; gap: 1rem; align-items: flex-end; flex-wrap: wrap; margin-top: 1rem;">
+                        <div style="flex: 1; min-width: 250px;">
+                            <label for="admet-smiles">SMILES</label>
+                            <input type="text" id="admet-smiles" placeholder="e.g., CC(=O)Oc1ccccc1C(=O)O" style="width:100%;">
+                        </div>
+                        <button id="admet-btn" class="btn-primary" style="padding: 0.6rem 1.5rem;">
+                            🧪 Analyse
+                        </button>
+                    </div>
+                </div>
+
+                <div id="admet-results" class="hidden slide-up" style="margin-top: 1rem;">
+
+                    <!-- Overall badge -->
+                    <div class="glass-panel" style="padding: 1.25rem; display: flex; align-items: center; gap: 1.5rem; flex-wrap: wrap;">
+                        <div>
+                            <div style="font-size: 0.8rem; color: var(--text-muted);">Overall Score</div>
+                            <div id="admet-score" style="font-size: 2.5rem; font-weight: 800;"></div>
+                        </div>
+                        <div id="admet-pass-badge" style="padding: 0.5rem 1.25rem; border-radius: 20px; font-weight: 700; font-size: 1rem;"></div>
+                        <div id="admet-alerts-summary" style="flex:1; font-size: 0.85rem;"></div>
+                        <button id="admet-use-btn" class="btn-secondary" style="padding: 0.4rem 1rem; font-size: 0.8rem;">Predict Properties</button>
+                    </div>
+
+                    <!-- ADMET cards -->
+                    <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 1rem; margin-top: 1rem;">
+                        <div class="glass-panel admet-card" id="admet-absorption"></div>
+                        <div class="glass-panel admet-card" id="admet-distribution"></div>
+                        <div class="glass-panel admet-card" id="admet-metabolism"></div>
+                        <div class="glass-panel admet-card" id="admet-excretion"></div>
+                        <div class="glass-panel admet-card" id="admet-toxicity"></div>
+                    </div>
+
+                    <!-- Alerts -->
+                    <div id="admet-alerts-panel" class="glass-panel hidden" style="margin-top: 1rem; padding: 1.25rem; border-left: 3px solid #f59e0b;">
+                        <h3 style="color: #fbbf24; margin-bottom: 0.75rem;">⚠️ Alerts</h3>
+                        <ul id="admet-alerts-list" style="list-style: none; padding: 0; display: flex; flex-direction: column; gap: 0.4rem;"></ul>
+                    </div>
+                </div>
+            </section>
+
         </main>
 
         <footer>

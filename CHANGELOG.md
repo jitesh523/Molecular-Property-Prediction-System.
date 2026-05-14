@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.3.0] - 2026-05-14
+
+### Added
+- **🧪 ADMET Property Prediction** — `POST /admet` and `POST /admet/batch` endpoints.
+  - **Absorption**: Lipinski Ro5, Veber rules, TPSA, oral bioavailability classification
+  - **Distribution**: BBB permeability (Clark model), fraction Csp3
+  - **Metabolism**: CYP3A4 / CYP1A2 / CYP2D6 inhibition risk flags
+  - **Excretion**: Renal clearance estimate from LogP
+  - **Toxicity**: hERG cardiotoxicity risk, Ames mutagenicity, PAINS alerts, Brenk structural alerts
+  - Composite 0-100 overall score (≥60 = pass)
+- **🧪 ADMET tab** in the web UI with 5 property cards (color-coded pass/warn/fail), alert list, overall badge.
+- Auto-prefill ADMET SMILES input from the last predicted molecule.
+- `src/molprop/features/admet.py` — `compute_admet()` function, `ADMETResult` dataclass.
+
 ## [2.2.0] - 2026-05-14
 
 ### Added

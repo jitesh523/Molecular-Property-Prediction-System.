@@ -31,6 +31,7 @@ from molprop.data.standardize import (
     standardize_smiles,
     veber_filter,
 )
+from molprop.features.admet import compute_admet
 from molprop.features.conformers import generate_3d_conformer, mol_to_pdb
 from molprop.features.descriptors import get_descriptor_names, smiles_to_descriptors
 from molprop.features.fingerprints import smiles_to_maccs, tanimoto_similarity
@@ -725,7 +726,7 @@ async def latent_map(req: LatentMapRequest):
             detail="VAE model not loaded. Train with `python scripts/train_vae.py` first.",
         )
 
-    from molprop.models.optimization import LatentOptimizer, compute_qed, smiles_to_properties
+    from molprop.models.optimization import compute_qed, smiles_to_properties
 
     vae = vae_state["model"]
     vocab = vae_state["vocab"]
@@ -851,6 +852,49 @@ async def compute_descriptors(req: DescriptorRequest):
         descriptors=desc_dict,
         maccs_fingerprint=maccs,
     )
+
+
+# ── ADMET Property Prediction Endpoint ────────────────────────────────────────
+
+
+class ADMETRequest(BaseModel):
+    smiles: str = Field(..., max_length=MAX_SMILES_LEN, description="SMILES string")
+
+
+@app.post("/admet", tags=["Cheminformatics"])
+async def admet_prediction(req: ADMETRequest):
+    """
+    Compute ADMET (Absorption, Distribution, Metabolism, Excretion, Toxicity) properties.
+
+    Uses RDKit rule-based filters, PAINS/Brenk structural alerts, and
+    established medicinal chemistry rules to assess drug-likeness safety.
+
+    Returns:
+    - Absorption: Lipinski Ro5, TPSA, oral bioavailability
+    - Distribution: BBB permeability, fraction Csp3
+    - Metabolism: CYP450 inhibition risk flags
+    - Excretion: Renal clearance estimate
+    - Toxicity: hERG risk, Ames mutagenicity, PAINS/Brenk alerts
+    - overall_score: 0-100 composite score (≥60 = pass)
+    """
+    result = compute_admet(req.smiles)
+    if result is None:
+        raise HTTPException(status_code=422, detail=f"Invalid SMILES: '{req.smiles}'")
+    return result.to_dict()
+
+
+class ADMETBatchRequest(BaseModel):
+    smiles_list: List[str] = Field(..., min_length=1, max_length=MAX_BATCH_SIZE)
+
+
+@app.post("/admet/batch", tags=["Cheminformatics"])
+async def admet_batch(req: ADMETBatchRequest):
+    """Compute ADMET for a batch of SMILES strings."""
+    results = []
+    for smi in req.smiles_list:
+        r = compute_admet(smi)
+        results.append(r.to_dict() if r else {"smiles": smi, "error": "Invalid SMILES"})
+    return {"results": results, "count": len(results)}
 
 
 # ── Batch Descriptor Endpoint ───────────────────────────────────────────────

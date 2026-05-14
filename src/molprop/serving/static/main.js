@@ -870,6 +870,160 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 
+    // ── ADMET Tab ────────────────────────────────────────────────────────────
+    const admetBtn = document.getElementById("admet-btn");
+    const admetSmilesInput = document.getElementById("admet-smiles");
+    const admetResults = document.getElementById("admet-results");
+    const admetScore = document.getElementById("admet-score");
+    const admetPassBadge = document.getElementById("admet-pass-badge");
+    const admetAlertsSummary = document.getElementById("admet-alerts-summary");
+    const admetAlertsPanel = document.getElementById("admet-alerts-panel");
+    const admetAlertsList = document.getElementById("admet-alerts-list");
+    const admetUseBtn = document.getElementById("admet-use-btn");
+
+    function admetRow(label, value, colorClass = "") {
+        return `<div class="admet-row"><span class="admet-label">${label}</span><span class="admet-value ${colorClass}">${value}</span></div>`;
+    }
+
+    function boolBadge(val) {
+        return val ? '<span class="admet-pass">✓ Pass</span>' : '<span class="admet-fail">✗ Fail</span>';
+    }
+
+    function riskColor(risk) {
+        if (risk === "High") return "admet-fail";
+        if (risk === "Moderate" || risk === "Possible") return "admet-warn";
+        return "admet-pass";
+    }
+
+    function fillAdmetCard(id, title, rows) {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.innerHTML = `<h4>${title}</h4>` + rows.join('');
+    }
+
+    if (admetBtn) {
+        admetBtn.addEventListener("click", async () => {
+            const smiles = admetSmilesInput?.value.trim();
+            if (!smiles) { alert("Enter a SMILES string"); return; }
+
+            admetBtn.disabled = true;
+            admetBtn.textContent = "⏳ Analysing…";
+            admetResults.classList.add("hidden");
+
+            try {
+                const resp = await fetch("/admet", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ smiles })
+                });
+                const d = await resp.json();
+                if (!resp.ok) throw new Error(d.detail || "ADMET failed");
+
+                // Overall score + badge
+                const score = d.overall_score;
+                admetScore.textContent = `${score}/100`;
+                admetScore.style.color = score >= 70 ? "#10b981" : score >= 50 ? "#fbbf24" : "#f87171";
+
+                if (d.pass_admet) {
+                    admetPassBadge.textContent = "✅ ADMET Pass";
+                    admetPassBadge.style.background = "rgba(16,185,129,0.15)";
+                    admetPassBadge.style.color = "#10b981";
+                    admetPassBadge.style.border = "1px solid #10b981";
+                } else {
+                    admetPassBadge.textContent = "❌ ADMET Concern";
+                    admetPassBadge.style.background = "rgba(248,113,113,0.15)";
+                    admetPassBadge.style.color = "#f87171";
+                    admetPassBadge.style.border = "1px solid #f87171";
+                }
+                admetAlertsSummary.textContent = d.alerts?.length
+                    ? `${d.alerts.length} alert${d.alerts.length > 1 ? 's' : ''} found`
+                    : "No alerts";
+
+                // Absorption
+                const abs = d.absorption || {};
+                fillAdmetCard("admet-absorption", "🫁 Absorption", [
+                    admetRow("MW", `${abs.mw} Da`),
+                    admetRow("LogP", abs.logp),
+                    admetRow("TPSA", `${abs.tpsa} Ų`),
+                    admetRow("HBD / HBA", `${abs.hbd} / ${abs.hba}`),
+                    admetRow("Rotatable bonds", abs.rotatable_bonds),
+                    admetRow("Lipinski Ro5", boolBadge(abs.lipinski_pass)),
+                    admetRow("Veber rules", boolBadge(abs.veber_pass)),
+                    admetRow("Oral bioavailability", abs.oral_bioavailability,
+                        abs.oral_bioavailability === "High" ? "admet-pass" : abs.oral_bioavailability === "Low" ? "admet-fail" : "admet-warn"),
+                ]);
+
+                // Distribution
+                const dist = d.distribution || {};
+                fillAdmetCard("admet-distribution", "🔄 Distribution", [
+                    admetRow("BBB permeability", dist.bbb_permeability, riskColor(dist.bbb_permeability === "Low" ? "High" : "Low")),
+                    admetRow("TPSA", `${dist.tpsa} Ų`),
+                    admetRow("Frac Csp3", dist.frac_csp3),
+                    admetRow("Aromatic rings", dist.aromatic_rings),
+                ]);
+
+                // Metabolism
+                const met = d.metabolism || {};
+                const cyp = met.cyp_inhibition || {};
+                fillAdmetCard("admet-metabolism", "⚗️ Metabolism", [
+                    admetRow("CYP3A4", cyp.CYP3A4, riskColor(cyp.CYP3A4)),
+                    admetRow("CYP1A2", cyp.CYP1A2, riskColor(cyp.CYP1A2)),
+                    admetRow("CYP2D6", cyp.CYP2D6, riskColor(cyp.CYP2D6)),
+                    admetRow("Rings", met.rings),
+                ]);
+
+                // Excretion
+                const exc = d.excretion || {};
+                fillAdmetCard("admet-excretion", "🚽 Excretion", [
+                    admetRow("LogP", exc.logp),
+                    admetRow("Renal clearance", exc.renal_clearance_estimate),
+                ]);
+
+                // Toxicity
+                const tox = d.toxicity || {};
+                fillAdmetCard("admet-toxicity", "☠️ Toxicity", [
+                    admetRow("hERG risk", tox.herg_risk, riskColor(tox.herg_risk)),
+                    admetRow("Ames mutagenicity", tox.ames_mutagenicity, riskColor(tox.ames_mutagenicity)),
+                    admetRow("PAINS alerts", tox.pains_alerts, tox.pains_alerts > 0 ? "admet-fail" : "admet-pass"),
+                    admetRow("Brenk alerts", tox.brenk_alerts, tox.brenk_alerts > 0 ? "admet-warn" : "admet-pass"),
+                ]);
+
+                // Alerts list
+                if (d.alerts?.length) {
+                    admetAlertsList.innerHTML = d.alerts.map(a =>
+                        `<li style="font-size:0.82rem;color:#fbbf24;padding:0.2rem 0;">⚠️ ${a}</li>`
+                    ).join('');
+                    admetAlertsPanel.classList.remove("hidden");
+                } else {
+                    admetAlertsPanel.classList.add("hidden");
+                }
+
+                admetResults.classList.remove("hidden");
+
+                // Use button pre-fills predict
+                if (admetUseBtn) {
+                    admetUseBtn.onclick = () => {
+                        smilesInput.value = smiles;
+                        document.querySelector('[data-tab="predict"]').click();
+                        predictBtn.click();
+                    };
+                }
+            } catch (err) {
+                alert(err.message);
+            } finally {
+                admetBtn.disabled = false;
+                admetBtn.textContent = "🧪 Analyse";
+            }
+        });
+
+        // Also allow pre-fill from predict tab's SMILES
+        document.querySelector('[data-tab="admet"]')?.addEventListener("click", () => {
+            if (lastPredictedSmiles && admetSmilesInput && !admetSmilesInput.value) {
+                admetSmilesInput.value = lastPredictedSmiles;
+            }
+        });
+    }
+
     // Enter key support
     smilesInput.addEventListener("keypress", (e) => { if (e.key === "Enter") predictBtn.click(); });
 });

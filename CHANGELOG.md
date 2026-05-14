@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.0] - 2026-05-14
+
+### Added
+- **Multi-Objective Pareto Optimization** — `POST /optimize/pareto` endpoint finds molecules simultaneously optimal across all selected objectives (NSGA-II inspired).
+  - Supported objectives: `qed`, `neg_sas`, `logp_norm`, `mw_norm`, `tpsa_norm`, `hbd_norm`, `hba_norm`
+  - Implements Pareto dominance and crowding distance for diversity preservation
+  - Supports seed molecule for neighborhood Pareto exploration
+- **`ParetoOptimizer` class** in `models/pareto.py` with `dominates()`, `compute_pareto_front()`, `compute_crowding_distance()` helpers
+- **🏆 Pareto Mode** section in the Optimize UI with objective checkboxes and dedicated results panel
+- **🔬 Find Analogs** button in Predict tab — one-click bridge that pre-fills the Optimize seed field with the currently predicted molecule
+- CSV export for Pareto front results
+- Checkbox-label styling for objective selectors
+
 ## [1.9.0] - 2026-05-13
 
 ### Added

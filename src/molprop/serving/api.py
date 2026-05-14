@@ -37,6 +37,7 @@ from molprop.features.fingerprints import smiles_to_maccs, tanimoto_similarity
 from molprop.features.graphs import smiles_to_graph
 from molprop.models.explain import explain_graph, get_explainer
 from molprop.models.optimization import LatentOptimizer
+from molprop.models.pareto import ParetoOptimizer
 from molprop.models.vae import SMILESVAE
 from molprop.models.visualize_explanations import get_explanation_image
 from molprop.serving.load_model import load_gnn_model
@@ -583,6 +584,107 @@ async def optimize_molecules(req: OptimizeRequest):
         candidates=candidates,
         total_attempts=req.n_candidates * (50 if req.method == "gradient_ascent" else 10),
         valid_count=len(candidates),
+    )
+
+
+# ── Pareto Optimization Endpoint ──────────────────────────────────────────────
+
+
+class ParetoRequest(BaseModel):
+    objectives: list[str] = Field(
+        ["qed", "neg_sas"],
+        description=(
+            "List of objectives to maximize simultaneously. "
+            "Supported: qed, neg_sas, logp_norm, mw_norm, tpsa_norm, hbd_norm, hba_norm"
+        ),
+    )
+    n_samples: int = Field(
+        200, ge=20, le=1000, description="Number of molecules to sample before Pareto filtering"
+    )
+    temperature: float = Field(0.8, ge=0.1, le=2.0, description="VAE sampling temperature")
+    seed_smiles: str | None = Field(
+        None, max_length=MAX_SMILES_LEN, description="Optional seed molecule"
+    )
+
+
+class ParetoMolecule(BaseModel):
+    smiles: str
+    objectives: dict[str, float]
+    properties: dict[str, float]
+    crowding_distance: float
+    latent_vector: list[float]
+
+
+class ParetoResponse(BaseModel):
+    objectives: list[str]
+    pareto_front: list[ParetoMolecule]
+    total_sampled: int
+    pareto_count: int
+    dominated_count: int
+
+
+@app.post("/optimize/pareto", response_model=ParetoResponse, tags=["Generative Design"])
+async def optimize_pareto(req: ParetoRequest):
+    """
+    Multi-objective Pareto optimization in VAE latent space.
+
+    Samples molecules and returns those on the Pareto front — optimal across
+    all specified objectives with no trade-off possible.
+
+    Objectives (all maximized):
+    - qed: Quantitative Estimate of Drug-likeness (0-1)
+    - neg_sas: Negative synthetic accessibility (easier synthesis = higher)
+    - logp_norm: LogP proximity to 0-5 optimal range
+    - mw_norm: MW proximity to 200-500 drug-like range
+    - tpsa_norm: TPSA proximity to 20-140 optimal range
+    - hbd_norm, hba_norm: H-bond counts within Lipinski range
+    """
+    if not vae_state.get("model"):
+        raise HTTPException(
+            status_code=503,
+            detail="VAE model not loaded. Train with `python scripts/train_vae.py` first.",
+        )
+
+    vae = vae_state["model"]
+    vocab = vae_state["vocab"]
+
+    lat_opt = LatentOptimizer(
+        vae=vae,
+        vocab=vocab,
+        max_len=vae_state.get("max_len", 120),
+        device="cpu",
+    )
+    pareto_opt = ParetoOptimizer(lat_opt)
+
+    try:
+        result = pareto_opt.optimize_pareto(
+            objectives=req.objectives,
+            n_samples=req.n_samples,
+            temperature=req.temperature,
+            seed_smiles=req.seed_smiles,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Pareto optimization failed: {exc}") from exc
+
+    pareto_molecules = [
+        ParetoMolecule(
+            smiles=m["smiles"],
+            objectives=m["objectives"],
+            properties=m["properties"],
+            crowding_distance=m.get("crowding_distance", 0.0),
+            latent_vector=m["z"],
+        )
+        for m in result["pareto_front"]
+    ]
+
+    return ParetoResponse(
+        objectives=result["objectives"],
+        pareto_front=pareto_molecules,
+        total_sampled=result["total_sampled"],
+        pareto_count=result["pareto_count"],
+        dominated_count=result["dominated_count"],
     )
 
 

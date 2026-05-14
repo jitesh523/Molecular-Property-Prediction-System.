@@ -103,6 +103,11 @@
                                 <span class="value" id="latency-display">—</span>
                             </div>
                         </div>
+                        <div style="margin-top: 1rem;">
+                            <button id="find-analogs-btn" class="btn-secondary" style="display:none;">
+                                🔬 Find Analogs in Latent Space
+                            </button>
+                        </div>
                     </div>
 
                     <!-- Structural Evidence -->
@@ -278,10 +283,35 @@
                         </div>
                     </div>
 
-                    <button id="optimize-btn" class="btn-primary btn-generate" disabled>
-                        🎯 Optimize Molecules
-                    </button>
+                    <div class="control-group" style="margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid var(--glass-border);">
+                        <h3 style="margin-bottom: 1rem;">🏆 Pareto Mode (Multi-Objective)</h3>
+                        <p class="section-desc" style="font-size: 0.85rem; margin-bottom: 1rem;">
+                            Find molecules that are simultaneously optimal across all selected objectives — no single trade-off dominates.
+                        </p>
+                        <label>Select objectives to maximize simultaneously:</label>
+                        <div style="display: flex; flex-wrap: wrap; gap: 0.75rem; margin-top: 0.5rem;">
+                            <label class="checkbox-label"><input type="checkbox" id="pareto-qed" checked> QED (drug-likeness)</label>
+                            <label class="checkbox-label"><input type="checkbox" id="pareto-negsas" checked> Ease of synthesis</label>
+                            <label class="checkbox-label"><input type="checkbox" id="pareto-logp"> LogP (0-5 range)</label>
+                            <label class="checkbox-label"><input type="checkbox" id="pareto-mw"> MW (200-500 range)</label>
+                            <label class="checkbox-label"><input type="checkbox" id="pareto-tpsa"> TPSA (20-140 range)</label>
+                        </div>
+                        <div class="control-group" style="margin-top: 1rem;">
+                            <label for="pareto-samples">Molecules to sample</label>
+                            <input type="number" id="pareto-samples" value="200" min="20" max="1000" step="20">
+                        </div>
+                    </div>
+
+                    <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
+                        <button id="optimize-btn" class="btn-primary btn-generate" disabled>
+                            🎯 Optimize (Single-Obj)
+                        </button>
+                        <button id="pareto-btn" class="btn-primary btn-generate" disabled style="background: linear-gradient(135deg, #d946ef, #8b5cf6);">
+                            🏆 Pareto Front
+                        </button>
+                    </div>
                     <div id="optimize-loading" class="spinner hidden"></div>
+                    <div id="pareto-loading" class="spinner hidden"></div>
                 </div>
 
                 <!-- Optimized molecules output -->
@@ -296,6 +326,20 @@
                         </div>
                     </div>
                     <div id="optimize-grid" class="generated-grid"></div>
+                </section>
+
+                <!-- Pareto results panel -->
+                <section id="pareto-results-panel" class="hidden">
+                    <div class="gen-header glass-panel slide-up">
+                        <h3 class="section-title">🏆 Pareto Front</h3>
+                        <div style="display: flex; gap: 1rem; align-items: center;">
+                            <div id="pareto-stats" class="gen-stats"></div>
+                            <button id="pareto-export-csv" class="btn-secondary" style="padding: 0.5rem 1rem; font-size: 0.85rem;">
+                                📥 Export CSV
+                            </button>
+                        </div>
+                    </div>
+                    <div id="pareto-grid" class="generated-grid"></div>
                 </section>
 
             </section>

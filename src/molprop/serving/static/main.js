@@ -59,9 +59,19 @@ document.addEventListener("DOMContentLoaded", () => {
     const optSasMax = document.getElementById("opt-sas-max");
     const optSeed = document.getElementById("opt-seed");
     const optExportCsv = document.getElementById("opt-export-csv");
+    const paretoBtn = document.getElementById("pareto-btn");
+    const paretoLoading = document.getElementById("pareto-loading");
+    const paretoResultsPanel = document.getElementById("pareto-results-panel");
+    const paretoGrid = document.getElementById("pareto-grid");
+    const paretoStats = document.getElementById("pareto-stats");
+    const paretoExportCsv = document.getElementById("pareto-export-csv");
+    const paretoSamples = document.getElementById("pareto-samples");
+    const findAnalogsBtn = document.getElementById("find-analogs-btn");
 
     // Store last optimization results for CSV export
     let lastOptimizeResults = [];
+    let lastParetoResults = [];
+    let lastPredictedSmiles = "";
 
     // ── Elements: Global ─────────────────────────────────────────────────────
     const appTitle = document.getElementById("app-title");
@@ -115,6 +125,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     optStatusBanner.className = "status-banner status-ready";
                 }
                 if (optimizeBtn) optimizeBtn.disabled = false;
+                if (paretoBtn) paretoBtn.disabled = false;
             } else {
                 badgeVae.textContent = "VAE Inactive";
                 badgeVae.style.opacity = "0.5";
@@ -168,6 +179,10 @@ document.addEventListener("DOMContentLoaded", () => {
             predValue.textContent = Number.isInteger(val) ? val : val.toFixed(4);
             stdSmilesDisplay.textContent = data.standardized_smiles || "-";
             predUncertainty.textContent = data.uncertainty_std ? `± ${data.uncertainty_std.task_1.toFixed(4)}` : "N/A";
+
+            // Track SMILES and show Find Analogs button
+            lastPredictedSmiles = data.standardized_smiles || smilesInput.value;
+            if (findAnalogsBtn) findAnalogsBtn.style.display = "inline-block";
 
             // Explanations
             if (data.explanation && data.explanation.svg) {
@@ -377,6 +392,122 @@ document.addEventListener("DOMContentLoaded", () => {
             } catch (err) {
                 console.error("Clipboard write failed:", err);
             }
+        });
+    }
+
+    // ── Find Analogs → bridge to Optimize tab ───────────────────────────────
+    if (findAnalogsBtn) {
+        findAnalogsBtn.addEventListener("click", () => {
+            if (!lastPredictedSmiles) return;
+            // Pre-fill seed molecule and switch to Optimize tab
+            if (optSeed) optSeed.value = lastPredictedSmiles;
+            document.querySelector('[data-tab="optimize"]').click();
+            // Scroll to seed input
+            if (optSeed) optSeed.scrollIntoView({ behavior: "smooth", block: "center" });
+        });
+    }
+
+    // ── Action: Pareto Optimization ─────────────────────────────────────────
+    if (paretoBtn) {
+        paretoBtn.addEventListener("click", async () => {
+            paretoGrid.innerHTML = '';
+            paretoResultsPanel.classList.add("hidden");
+            paretoLoading.classList.remove("hidden");
+            paretoBtn.disabled = true;
+
+            // Gather selected objectives
+            const objectives = [];
+            if (document.getElementById("pareto-qed")?.checked) objectives.push("qed");
+            if (document.getElementById("pareto-negsas")?.checked) objectives.push("neg_sas");
+            if (document.getElementById("pareto-logp")?.checked) objectives.push("logp_norm");
+            if (document.getElementById("pareto-mw")?.checked) objectives.push("mw_norm");
+            if (document.getElementById("pareto-tpsa")?.checked) objectives.push("tpsa_norm");
+
+            if (objectives.length < 2) {
+                alert("Select at least 2 objectives for Pareto optimization");
+                paretoLoading.classList.add("hidden");
+                paretoBtn.disabled = false;
+                return;
+            }
+
+            const seedValue = optSeed && optSeed.value.trim() ? optSeed.value.trim() : null;
+
+            try {
+                const resp = await fetch("/optimize/pareto", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        objectives: objectives,
+                        n_samples: parseInt(paretoSamples ? paretoSamples.value : 200),
+                        temperature: parseFloat(optTempInput ? optTempInput.value : 0.8),
+                        seed_smiles: seedValue
+                    })
+                });
+
+                const data = await resp.json();
+                if (!resp.ok) throw new Error(data.detail || "Pareto optimization failed");
+
+                lastParetoResults = data.pareto_front || [];
+
+                data.pareto_front.forEach(mol => {
+                    const card = document.createElement("div");
+                    card.className = "gen-mol-card slide-up";
+                    const objEntries = Object.entries(mol.objectives || {})
+                        .map(([k, v]) => `<div style="font-size:0.7rem;color:#d946ef;">${k}: ${v.toFixed(3)}</div>`)
+                        .join('');
+                    const propEntries = Object.entries(mol.properties || {})
+                        .filter(([k]) => ["mw","logp","tpsa","qed","sas"].includes(k))
+                        .map(([k, v]) => `<div style="font-size:0.7rem;color:#94a3b8;">${k}: ${typeof v === 'number' ? v.toFixed(2) : v}</div>`)
+                        .join('');
+                    const cd = isFinite(mol.crowding_distance) ? mol.crowding_distance.toFixed(3) : "∞";
+
+                    card.innerHTML = `
+                        <span class="gen-badge" style="background:linear-gradient(135deg,#d946ef,#8b5cf6);">Pareto (cd=${cd})</span>
+                        <div class="analog-smiles" style="font-size:0.8rem;color:white;margin:0.5rem 0;">${mol.smiles}</div>
+                        <div>${objEntries}</div>
+                        <div>${propEntries}</div>
+                        <button class="btn-primary" style="padding:0.4rem;font-size:0.7rem;margin-top:0.5rem;"
+                                onclick="useGenerated('${mol.smiles}')">Predict Properties</button>
+                    `;
+                    paretoGrid.appendChild(card);
+                });
+
+                paretoStats.textContent = `Pareto front: ${data.pareto_count} / ${data.total_sampled} sampled (${data.dominated_count} dominated)`;
+                paretoResultsPanel.classList.remove("hidden");
+            } catch (err) {
+                alert(err.message);
+            } finally {
+                paretoLoading.classList.add("hidden");
+                paretoBtn.disabled = false;
+            }
+        });
+    }
+
+    // ── Pareto CSV Export ───────────────────────────────────────────────────
+    if (paretoExportCsv) {
+        paretoExportCsv.addEventListener("click", () => {
+            if (!lastParetoResults.length) {
+                alert("No Pareto results to export");
+                return;
+            }
+            const headers = ["SMILES", "Crowding Distance", "QED", "MW", "LogP", "TPSA", "SAS"];
+            const rows = lastParetoResults.map(mol => [
+                mol.smiles,
+                isFinite(mol.crowding_distance) ? mol.crowding_distance.toFixed(4) : "inf",
+                mol.properties?.qed?.toFixed(4) || "",
+                mol.properties?.mw?.toFixed(2) || "",
+                mol.properties?.logp?.toFixed(2) || "",
+                mol.properties?.tpsa?.toFixed(2) || "",
+                mol.properties?.sas?.toFixed(2) || ""
+            ]);
+            const csv = [headers.join(","), ...rows.map(r => r.join(","))].join("\n");
+            const blob = new Blob([csv], { type: "text/csv" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = `pareto_front_${new Date().toISOString().slice(0, 10)}.csv`;
+            a.click();
+            URL.revokeObjectURL(url);
         });
     }
 

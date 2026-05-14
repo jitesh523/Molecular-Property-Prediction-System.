@@ -68,10 +68,106 @@ document.addEventListener("DOMContentLoaded", () => {
     const paretoSamples = document.getElementById("pareto-samples");
     const findAnalogsBtn = document.getElementById("find-analogs-btn");
 
+    // ── Elements: History Tab ────────────────────────────────────────────────
+    const historyList = document.getElementById("history-list");
+    const historyCount = document.getElementById("history-count");
+    const historyCompareBtn = document.getElementById("history-compare-btn");
+    const historyExportBtn = document.getElementById("history-export-btn");
+    const historyClearBtn = document.getElementById("history-clear-btn");
+    const historyComparePanel = document.getElementById("history-compare-panel");
+    const historyCompareTable = document.getElementById("history-compare-table");
+
     // Store last optimization results for CSV export
     let lastOptimizeResults = [];
     let lastParetoResults = [];
     let lastPredictedSmiles = "";
+
+    // ── History: localStorage helpers ────────────────────────────────────────
+    const HISTORY_KEY = "molprop_history";
+    const MAX_HISTORY = 50;
+
+    function loadHistory() {
+        try { return JSON.parse(localStorage.getItem(HISTORY_KEY) || "[]"); }
+        catch { return []; }
+    }
+
+    function saveHistory(h) {
+        localStorage.setItem(HISTORY_KEY, JSON.stringify(h.slice(0, MAX_HISTORY)));
+    }
+
+    function addToHistory(entry) {
+        const h = loadHistory();
+        h.unshift({ ...entry, id: Date.now(), timestamp: new Date().toLocaleString() });
+        saveHistory(h);
+        if (document.getElementById("tab-history")?.classList.contains("active")) {
+            renderHistory();
+        }
+        if (historyCount) historyCount.textContent = `${h.length} molecule${h.length !== 1 ? 's' : ''} saved`;
+    }
+
+    function renderHistory() {
+        const h = loadHistory();
+        if (!historyList) return;
+        historyList.innerHTML = '';
+        if (!h.length) {
+            historyList.innerHTML = '<p style="color:var(--text-muted);text-align:center;padding:2rem;">No predictions yet. Predict a molecule to see history here.</p>';
+            if (historyCount) historyCount.textContent = "0 molecules";
+            if (historyCompareBtn) historyCompareBtn.disabled = true;
+            return;
+        }
+        if (historyCount) historyCount.textContent = `${h.length} molecule${h.length !== 1 ? 's' : ''} saved`;
+        h.forEach(entry => {
+            const row = document.createElement("div");
+            row.className = "history-row";
+            row.dataset.id = entry.id;
+
+            const propChips = Object.entries(entry.properties || {})
+                .map(([k, v]) => `<span class="history-prop-chip">${k}: ${typeof v === 'number' ? v.toFixed(2) : v}</span>`)
+                .join('');
+
+            row.innerHTML = `
+                <input type="checkbox" class="history-checkbox" data-id="${entry.id}" style="width:1.1rem;height:1.1rem;accent-color:var(--primary);">
+                <div style="flex:1;min-width:0;">
+                    <div class="history-smiles">${entry.smiles}</div>
+                    <div style="font-size:0.75rem;color:var(--text-muted);margin-top:0.2rem;">${entry.timestamp}</div>
+                </div>
+                <div class="history-pred">${typeof entry.prediction === 'number' ? entry.prediction.toFixed(4) : entry.prediction ?? '—'}</div>
+                <div class="history-props">${propChips}</div>
+                <div style="display:flex;gap:0.5rem;">
+                    <button class="btn-secondary" style="padding:0.3rem 0.6rem;font-size:0.75rem;"
+                            onclick="window.historyPredict('${entry.smiles}')">Predict</button>
+                    <button class="btn-secondary" style="padding:0.3rem 0.6rem;font-size:0.75rem;"
+                            onclick="window.historyOptimize('${entry.smiles}')">Optimize</button>
+                </div>
+            `;
+            historyList.appendChild(row);
+        });
+
+        // Update compare button based on checkbox state
+        historyList.querySelectorAll(".history-checkbox").forEach(cb => {
+            cb.addEventListener("change", () => {
+                const checked = historyList.querySelectorAll(".history-checkbox:checked").length;
+                if (historyCompareBtn) historyCompareBtn.disabled = checked < 2;
+            });
+        });
+    }
+
+    // Bridge: history -> predict tab
+    window.historyPredict = (smiles) => {
+        smilesInput.value = smiles;
+        document.querySelector('[data-tab="predict"]').click();
+        predictBtn.click();
+    };
+
+    // Bridge: history -> optimize tab
+    window.historyOptimize = (smiles) => {
+        if (optSeed) optSeed.value = smiles;
+        document.querySelector('[data-tab="optimize"]').click();
+        if (optSeed) optSeed.scrollIntoView({ behavior: "smooth", block: "center" });
+    };
+
+    // Render on history tab click
+    document.querySelector('[data-tab="history"]')?.addEventListener("click", renderHistory);
 
     // ── Elements: Global ─────────────────────────────────────────────────────
     const appTitle = document.getElementById("app-title");
@@ -183,6 +279,14 @@ document.addEventListener("DOMContentLoaded", () => {
             // Track SMILES and show Find Analogs button
             lastPredictedSmiles = data.standardized_smiles || smilesInput.value;
             if (findAnalogsBtn) findAnalogsBtn.style.display = "inline-block";
+
+            // Save to history
+            addToHistory({
+                smiles: data.standardized_smiles || smilesInput.value,
+                prediction: data.predictions?.task_1,
+                uncertainty: data.uncertainty_std?.task_1,
+                properties: {}
+            });
 
             // Explanations
             if (data.explanation && data.explanation.svg) {
@@ -392,6 +496,59 @@ document.addEventListener("DOMContentLoaded", () => {
             } catch (err) {
                 console.error("Clipboard write failed:", err);
             }
+        });
+    }
+
+    // ── History: Compare ────────────────────────────────────────────────────
+    if (historyCompareBtn) {
+        historyCompareBtn.addEventListener("click", () => {
+            const checked = [...historyList.querySelectorAll(".history-checkbox:checked")];
+            const ids = checked.map(cb => parseInt(cb.dataset.id));
+            const h = loadHistory();
+            const selected = h.filter(e => ids.includes(e.id));
+            if (selected.length < 2) return;
+
+            const propKeys = [...new Set(selected.flatMap(e => Object.keys(e.properties || {})))];
+            const rows = [
+                ["Property", ...selected.map(e => e.smiles.length > 20 ? e.smiles.slice(0, 20) + "…" : e.smiles)],
+                ["Prediction", ...selected.map(e => typeof e.prediction === 'number' ? e.prediction.toFixed(4) : '—')],
+                ["Uncertainty", ...selected.map(e => e.uncertainty ? `±${e.uncertainty.toFixed(4)}` : '—')],
+                ...propKeys.map(k => [k, ...selected.map(e => e.properties?.[k] != null ? Number(e.properties[k]).toFixed(2) : '—')])
+            ];
+
+            historyCompareTable.innerHTML = rows.map((row, i) => `
+                <tr>${row.map(cell => i === 0 ? `<th>${cell}</th>` : `<td>${cell}</td>`).join('')}</tr>
+            `).join('');
+            historyComparePanel.classList.remove("hidden");
+            historyComparePanel.scrollIntoView({ behavior: "smooth" });
+        });
+    }
+
+    // ── History: Export CSV ─────────────────────────────────────────────────
+    if (historyExportBtn) {
+        historyExportBtn.addEventListener("click", () => {
+            const h = loadHistory();
+            if (!h.length) { alert("No history to export"); return; }
+            const headers = ["SMILES", "Prediction", "Uncertainty", "Timestamp"];
+            const rows = h.map(e => [e.smiles, e.prediction ?? "", e.uncertainty ?? "", e.timestamp]);
+            const csv = [headers.join(","), ...rows.map(r => r.join(","))].join("\n");
+            const blob = new Blob([csv], { type: "text/csv" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = `prediction_history_${new Date().toISOString().slice(0, 10)}.csv`;
+            a.click();
+            URL.revokeObjectURL(url);
+        });
+    }
+
+    // ── History: Clear ──────────────────────────────────────────────────────
+    if (historyClearBtn) {
+        historyClearBtn.addEventListener("click", () => {
+            if (!confirm("Clear all prediction history?")) return;
+            localStorage.removeItem(HISTORY_KEY);
+            renderHistory();
+            if (historyComparePanel) historyComparePanel.classList.add("hidden");
         });
     }
 

@@ -364,3 +364,75 @@ select:focus {
 .checkbox-label input[type="checkbox"] {
     accent-color: var(--primary);
 }
+
+/* History & Comparison Table */
+.compare-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+}
+
+.compare-table th {
+    background: rgba(139, 92, 246, 0.15);
+    color: var(--primary-hover);
+    padding: 0.6rem 1rem;
+    text-align: left;
+    font-weight: 600;
+    border-bottom: 1px solid var(--glass-border);
+    white-space: nowrap;
+}
+
+.compare-table td {
+    padding: 0.5rem 1rem;
+    border-bottom: 1px solid var(--glass-border);
+    color: var(--text-main);
+    vertical-align: middle;
+}
+
+.compare-table tr:hover td {
+    background: rgba(139, 92, 246, 0.05);
+}
+
+.history-row {
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    border-radius: 12px;
+    padding: 1rem 1.5rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+.history-row:hover {
+    border-color: var(--primary);
+}
+
+.history-smiles {
+    font-family: monospace;
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    flex: 1;
+    min-width: 200px;
+}
+
+.history-pred {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--primary-hover);
+}
+
+.history-props {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+
+.history-prop-chip {
+    background: rgba(255,255,255,0.05);
+    border: 1px solid var(--glass-border);
+    border-radius: 4px;
+    padding: 0.15rem 0.4rem;
+}

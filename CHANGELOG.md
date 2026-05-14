@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.0] - 2026-05-14
+
+### Added
+- **📋 Prediction History tab** — session log of all predicted molecules backed by `localStorage` (up to 50 entries).
+  - Each entry shows SMILES, prediction value, uncertainty, timestamp, and property chips.
+  - Per-row "Predict" and "Optimize" shortcut buttons.
+- **⚖️ Side-by-side comparison** — select 2+ molecules with checkboxes and compare all properties in a table.
+- **CSV export** for entire history log.
+- **🗑 Clear history** button.
+- History auto-renders when switching to History tab.
+
 ## [2.0.0] - 2026-05-14
 
 ### Added

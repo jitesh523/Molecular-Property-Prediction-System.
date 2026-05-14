@@ -34,6 +34,9 @@
             <button class="tab-btn" data-tab="optimize">
                 <span class="tab-icon">🎯</span> Optimize
             </button>
+            <button class="tab-btn" data-tab="history">
+                <span class="tab-icon">📋</span> History
+            </button>
         </nav>
 
         <main>
@@ -342,6 +345,37 @@
                     <div id="pareto-grid" class="generated-grid"></div>
                 </section>
 
+            </section>
+
+            <!-- ══════════════════════════════════════════════════════════════
+                 TAB 4 – HISTORY
+            ══════════════════════════════════════════════════════════════ -->
+            <section id="tab-history" class="tab-panel hidden">
+                <div class="input-section glass-panel fade-in slide-up">
+                    <h2>📋 Prediction History</h2>
+                    <p class="section-desc">Session log of all predicted molecules. Compare side-by-side and export.</p>
+                    <div style="display: flex; gap: 0.75rem; flex-wrap: wrap; margin-top: 1rem;">
+                        <button id="history-compare-btn" class="btn-primary" style="padding: 0.5rem 1rem; font-size: 0.85rem;" disabled>
+                            ⚖️ Compare Selected
+                        </button>
+                        <button id="history-export-btn" class="btn-secondary" style="padding: 0.5rem 1rem; font-size: 0.85rem;">
+                            📥 Export CSV
+                        </button>
+                        <button id="history-clear-btn" class="btn-secondary" style="padding: 0.5rem 1rem; font-size: 0.85rem; border-color: var(--danger); color: var(--danger);">
+                            🗑 Clear History
+                        </button>
+                        <span id="history-count" class="gen-stats" style="align-self: center;"></span>
+                    </div>
+                </div>
+
+                <!-- Comparison view -->
+                <div id="history-compare-panel" class="glass-panel hidden slide-up" style="overflow-x: auto; margin-top: 1rem;">
+                    <h3 class="section-title" style="margin-bottom: 1rem;">⚖️ Side-by-Side Comparison</h3>
+                    <table id="history-compare-table" class="compare-table"></table>
+                </div>
+
+                <!-- History list -->
+                <div id="history-list" style="display: flex; flex-direction: column; gap: 0.75rem; margin-top: 1rem;"></div>
             </section>
         </main>
 

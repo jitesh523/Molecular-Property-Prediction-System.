@@ -480,6 +480,101 @@ async def generate_molecules(req: GenerateRequest):
     return results
 
 
+class SmartGenerateRequest(BaseModel):
+    n_target: int = Field(20, ge=1, le=100, description="Number of valid passing molecules wanted")
+    max_attempts: int = Field(
+        500, ge=50, le=2000, description="Max sampling attempts before giving up"
+    )
+    temperature: float = Field(0.9, ge=0.1, le=2.0)
+    targets: dict[str, tuple[float, float]] = Field(
+        ...,
+        description="Property -> (min, max) ranges. Supported: mw, logp, tpsa, hbd, hba, qed",
+    )
+
+
+@app.post("/generate/smart", tags=["Generative Design"])
+async def generate_smart(req: SmartGenerateRequest):
+    """
+    Smart generation: sample molecules from the VAE and keep only those
+    whose properties fall within all target ranges.
+
+    Returns up to `n_target` valid molecules with their properties.
+    """
+    if not vae_state.get("model"):
+        raise HTTPException(status_code=503, detail="VAE model not loaded.")
+
+    from molprop.models.optimization import compute_qed, smiles_to_properties
+
+    vae: SMILESVAE = vae_state["model"]
+    vocab: SmilesVocab = vae_state["vocab"]
+    max_len: int = vae_state["max_len"]
+
+    valid_targets = {"mw", "logp", "tpsa", "hbd", "hba", "qed"}
+    invalid = [t for t in req.targets if t not in valid_targets]
+    if invalid:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Unsupported targets: {invalid}. Supported: {sorted(valid_targets)}",
+        )
+
+    accepted = []
+    attempts = 0
+    batch_size = 50
+
+    with torch.no_grad():
+        while len(accepted) < req.n_target and attempts < req.max_attempts:
+            z = torch.randn(batch_size, vae.latent_dim)
+            logits = vae.decode(z, max_len=max_len, temperature=req.temperature)
+            token_ids = logits.argmax(dim=-1).cpu().tolist()
+
+            for ids in token_ids:
+                attempts += 1
+                if len(accepted) >= req.n_target or attempts >= req.max_attempts:
+                    break
+                raw_smi = vocab.decode(ids)
+                std_smi = standardize_smiles(raw_smi) if raw_smi else None
+                if not std_smi:
+                    continue
+
+                props = smiles_to_properties(std_smi)
+                if not props:
+                    continue
+                # Add QED if needed
+                if "qed" in req.targets:
+                    qed_val = compute_qed(std_smi)
+                    if qed_val is None:
+                        continue
+                    props["qed"] = qed_val
+
+                # Check all target ranges
+                passes = True
+                for prop, (lo, hi) in req.targets.items():
+                    val = props.get(prop)
+                    if val is None or val < lo or val > hi:
+                        passes = False
+                        break
+
+                if passes:
+                    accepted.append(
+                        {
+                            "smiles": std_smi,
+                            "properties": {
+                                k: round(float(v), 3)
+                                for k, v in props.items()
+                                if isinstance(v, (int, float))
+                            },
+                        }
+                    )
+
+    return {
+        "molecules": accepted,
+        "n_accepted": len(accepted),
+        "n_attempts": attempts,
+        "acceptance_rate": round(len(accepted) / max(1, attempts), 4),
+        "targets": {k: list(v) for k, v in req.targets.items()},
+    }
+
+
 @app.get("/generate/status", tags=["Generative Design"])
 async def generate_status():
     """Check whether the VAE generator is loaded and ready."""
@@ -1015,6 +1110,99 @@ async def similarity_search(smiles: str, top_k: int = 5):
         "standardized_smiles": std_smiles,
         "indexed_molecules": vector_store.count(),
         "results": results,
+    }
+
+
+# ── Fingerprint Similarity Search ─────────────────────────────────────────────
+
+
+class SimilaritySearchRequest(BaseModel):
+    smiles: str = Field(..., max_length=MAX_SMILES_LEN, description="Query SMILES string")
+    top_k: int = Field(10, ge=1, le=50, description="Number of similar molecules to return")
+    fingerprint_type: str = Field(
+        "morgan", pattern="^(morgan|maccs)$", description="Fingerprint type: morgan or maccs"
+    )
+    threshold: float = Field(0.5, ge=0.0, le=1.0, description="Minimum similarity threshold")
+
+
+class SimilarityResult(BaseModel):
+    smiles: str
+    score: float
+    rank: int
+
+
+@app.post("/search/similar", tags=["Search"])
+async def fingerprint_similarity_search(req: SimilaritySearchRequest):
+    """
+    Find chemically similar molecules using fingerprint-based similarity.
+
+    Uses either Morgan (circular, ECFP-like) or MACCS fingerprints with
+    Tanimoto coefficient. Searches against the indexed molecule database.
+    """
+    from rdkit import Chem, DataStructs
+    from rdkit.Chem import AllChem
+
+    mol = Chem.MolFromSmiles(req.smiles)
+    if mol is None:
+        raise HTTPException(status_code=422, detail=f"Invalid SMILES: '{req.smiles}'")
+
+    # Generate query fingerprint
+    if req.fingerprint_type == "morgan":
+        query_fp = AllChem.GetMorganFingerprintAsBitVect(mol, 2, nBits=2048)
+    else:
+        from rdkit.Chem import MACCSkeys
+
+        query_fp = MACCSkeys.GenMACCSKeys(mol)
+
+    # Search in vector DB if populated (fallback: empty)
+    if vector_store.count() == 0:
+        raise HTTPException(
+            status_code=503, detail="Vector database is empty. Index molecules first."
+        )
+
+    # Get all indexed molecules and compute similarities
+    # In production, this should use a fingerprint index (RDKit cartridge, etc.)
+    # For now, we search through the indexed set
+    all_results = []
+    for point in vector_store.client.scroll(
+        collection_name=vector_store.collection_name,
+        limit=1000,
+        with_payload=True,
+        with_vectors=False,
+    )[0]:
+        smi = point.payload.get("smiles", "")
+        if not smi:
+            continue
+        target_mol = Chem.MolFromSmiles(smi)
+        if target_mol is None:
+            continue
+
+        if req.fingerprint_type == "morgan":
+            target_fp = AllChem.GetMorganFingerprintAsBitVect(target_mol, 2, nBits=2048)
+        else:
+            from rdkit.Chem import MACCSkeys
+
+            target_fp = MACCSkeys.GenMACCSKeys(target_mol)
+
+        sim = DataStructs.TanimotoSimilarity(query_fp, target_fp)
+        if sim >= req.threshold:
+            all_results.append({"smiles": smi, "score": sim, "payload": point.payload})
+
+    # Sort by similarity descending
+    all_results.sort(key=lambda x: x["score"], reverse=True)
+    top_results = all_results[: req.top_k]
+
+    return {
+        "query_smiles": req.smiles,
+        "fingerprint_type": req.fingerprint_type,
+        "threshold": req.threshold,
+        "total_indexed": vector_store.count(),
+        "results": [
+            SimilarityResult(
+                smiles=r["smiles"], score=round(r["score"], 4), rank=i + 1
+            ).model_dump()
+            for i, r in enumerate(top_results)
+        ],
     }
 
 

@@ -43,6 +43,18 @@
             <button class="tab-btn" data-tab="admet">
                 <span class="tab-icon">🧪</span> ADMET
             </button>
+            <button class="tab-btn" data-tab="batch">
+                <span class="tab-icon">📁</span> Batch
+            </button>
+            <button class="tab-btn" data-tab="search">
+                <span class="tab-icon">🔍</span> Search
+            </button>
+            <button class="tab-btn" data-tab="viewer3d">
+                <span class="tab-icon">🧬</span> 3D View
+            </button>
+            <button class="tab-btn" data-tab="dashboard">
+                <span class="tab-icon">📊</span> Dashboard
+            </button>
         </nav>
 
         <main>
@@ -183,6 +195,73 @@
                         <div id="gen-stats" class="gen-stats"></div>
                     </div>
                     <div id="gen-grid" class="generated-grid"></div>
+                </section>
+
+                <!-- Smart Generation -->
+                <div class="input-section glass-panel fade-in slide-up" style="margin-top: 1rem;">
+                    <h3>🎯 Smart Generation with Property Targets</h3>
+                    <p class="section-desc">Generate molecules that fall within specified property ranges. Filters drug-like candidates from VAE samples.</p>
+
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0.75rem; margin-top: 1rem;">
+                        <div class="smart-target">
+                            <label class="checkbox-label" style="border: none; padding: 0;">
+                                <input type="checkbox" id="smart-mw-on" checked> MW (Da)
+                            </label>
+                            <div style="display:flex;gap:0.3rem;">
+                                <input type="number" id="smart-mw-min" value="200" step="10" style="width:50%;">
+                                <input type="number" id="smart-mw-max" value="500" step="10" style="width:50%;">
+                            </div>
+                        </div>
+                        <div class="smart-target">
+                            <label class="checkbox-label" style="border: none; padding: 0;">
+                                <input type="checkbox" id="smart-logp-on" checked> LogP
+                            </label>
+                            <div style="display:flex;gap:0.3rem;">
+                                <input type="number" id="smart-logp-min" value="0" step="0.1" style="width:50%;">
+                                <input type="number" id="smart-logp-max" value="5" step="0.1" style="width:50%;">
+                            </div>
+                        </div>
+                        <div class="smart-target">
+                            <label class="checkbox-label" style="border: none; padding: 0;">
+                                <input type="checkbox" id="smart-qed-on" checked> QED
+                            </label>
+                            <div style="display:flex;gap:0.3rem;">
+                                <input type="number" id="smart-qed-min" value="0.5" step="0.05" min="0" max="1" style="width:50%;">
+                                <input type="number" id="smart-qed-max" value="1.0" step="0.05" min="0" max="1" style="width:50%;">
+                            </div>
+                        </div>
+                        <div class="smart-target">
+                            <label class="checkbox-label" style="border: none; padding: 0;">
+                                <input type="checkbox" id="smart-tpsa-on"> TPSA
+                            </label>
+                            <div style="display:flex;gap:0.3rem;">
+                                <input type="number" id="smart-tpsa-min" value="0" step="5" style="width:50%;">
+                                <input type="number" id="smart-tpsa-max" value="140" step="5" style="width:50%;">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div style="display: flex; gap: 1rem; align-items: flex-end; flex-wrap: wrap; margin-top: 1rem;">
+                        <div style="min-width: 120px;">
+                            <label for="smart-n-target">Target Count</label>
+                            <input type="number" id="smart-n-target" value="20" min="1" max="100" style="width:100%;">
+                        </div>
+                        <div style="min-width: 120px;">
+                            <label for="smart-max-attempts">Max Attempts</label>
+                            <input type="number" id="smart-max-attempts" value="500" min="50" max="2000" step="50" style="width:100%;">
+                        </div>
+                        <button id="smart-gen-btn" class="btn-primary" style="padding: 0.6rem 1.5rem;" disabled>
+                            🎯 Smart Generate
+                        </button>
+                    </div>
+                </div>
+
+                <section id="smart-results-panel" class="hidden">
+                    <div class="gen-header glass-panel slide-up">
+                        <h3 class="section-title">🎯 Property-Targeted Molecules</h3>
+                        <div id="smart-stats" class="gen-stats"></div>
+                    </div>
+                    <div id="smart-grid" class="generated-grid"></div>
                 </section>
 
             </section>
@@ -487,6 +566,202 @@
                 </div>
             </section>
 
+            <!-- ══════════════════════════════════════════════════════════════
+                 TAB 7 – BATCH PREDICTION
+            ══════════════════════════════════════════════════════════════ -->
+            <section id="tab-batch" class="tab-panel hidden">
+                <div class="input-section glass-panel fade-in slide-up">
+                    <h2>📁 Batch Prediction</h2>
+                    <p class="section-desc">Predict properties for multiple molecules at once. Paste SMILES (one per line) or upload a CSV file.</p>
+
+                    <div style="display: flex; gap: 1.5rem; flex-wrap: wrap; margin-top: 1rem;">
+                        <div style="flex: 1; min-width: 300px;">
+                            <label for="batch-textarea">SMILES (one per line)</label>
+                            <textarea id="batch-textarea" rows="6" placeholder="CCO&#10;c1ccccc1&#10;CC(=O)O" style="width:100%;font-family:monospace;"></textarea>
+                        </div>
+                        <div style="min-width: 200px; display: flex; flex-direction: column; gap: 1rem;">
+                            <div>
+                                <label>Or upload CSV</label>
+                                <input type="file" id="batch-file" accept=".csv,.txt" style="margin-top: 0.5rem;">
+                            </div>
+                            <div>
+                                <label class="checkbox-label" style="display:flex;align-items:center;gap:0.5rem;">
+                                    <input type="checkbox" id="batch-explain" checked> Include explanations
+                                </label>
+                            </div>
+                            <button id="batch-btn" class="btn-primary" style="padding: 0.6rem 1.5rem; margin-top: auto;" disabled>
+                                🔮 Predict Batch
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="batch-results" class="hidden slide-up" style="margin-top: 1rem;">
+                    <div class="glass-panel" style="padding: 1rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+                        <span id="batch-stats" class="gen-stats"></span>
+                        <div style="display: flex; gap: 0.5rem;">
+                            <button id="batch-export-btn" class="btn-secondary" style="padding: 0.5rem 1rem; font-size: 0.85rem;">
+                                📥 Export CSV
+                            </button>
+                            <button id="batch-clear-btn" class="btn-secondary" style="padding: 0.5rem 1rem; font-size: 0.85rem; color: var(--danger); border-color: var(--danger);">
+                                Clear
+                            </button>
+                        </div>
+                    </div>
+
+                    <div style="overflow-x: auto; margin-top: 1rem;">
+                        <table id="batch-table" class="compare-table">
+                            <thead>
+                                <tr>
+                                    <th>#</th>
+                                    <th>SMILES</th>
+                                    <th>Prediction</th>
+                                    <th>Uncertainty</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ══════════════════════════════════════════════════════════════
+                 TAB 8 – SIMILARITY SEARCH
+            ══════════════════════════════════════════════════════════════ -->
+            <section id="tab-search" class="tab-panel hidden">
+                <div class="input-section glass-panel fade-in slide-up">
+                    <h2>🔍 Fingerprint Similarity Search</h2>
+                    <p class="section-desc">Find chemically similar molecules using Morgan (ECFP-like) or MACCS fingerprints with Tanimoto similarity.</p>
+
+                    <div style="display: flex; gap: 1.5rem; flex-wrap: wrap; align-items: flex-end; margin-top: 1rem;">
+                        <div style="flex: 1; min-width: 250px;">
+                            <label for="search-smiles">Query SMILES</label>
+                            <input type="text" id="search-smiles" placeholder="Enter SMILES to search..." style="width:100%;">
+                        </div>
+                        <div style="min-width: 140px;">
+                            <label for="search-fp">Fingerprint</label>
+                            <select id="search-fp" style="width:100%;padding:0.6rem 1rem;">
+                                <option value="morgan">Morgan (ECFP)</option>
+                                <option value="maccs">MACCS</option>
+                            </select>
+                        </div>
+                        <div style="min-width: 100px;">
+                            <label for="search-topk">Top-K</label>
+                            <input type="number" id="search-topk" value="10" min="1" max="50" style="width:100%;">
+                        </div>
+                        <div style="min-width: 100px;">
+                            <label for="search-threshold">Threshold</label>
+                            <input type="number" id="search-threshold" value="0.5" min="0" max="1" step="0.05" style="width:100%;">
+                        </div>
+                        <button id="search-btn" class="btn-primary" style="padding: 0.6rem 1.5rem;" disabled>
+                            🔍 Search
+                        </button>
+                    </div>
+                </div>
+
+                <div id="search-results" class="hidden slide-up" style="margin-top: 1rem;">
+                    <div class="glass-panel" style="padding: 1rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+                        <span id="search-stats" class="gen-stats"></span>
+                        <div id="search-legend" style="display: flex; gap: 0.5rem; align-items: center; font-size: 0.8rem;">
+                            <span style="padding: 0.2rem 0.5rem; background: rgba(16,185,129,0.2); color: #10b981; border-radius: 4px;">High (>0.7)</span>
+                            <span style="padding: 0.2rem 0.5rem; background: rgba(251,191,36,0.2); color: #fbbf24; border-radius: 4px;">Medium (0.5-0.7)</span>
+                        </div>
+                    </div>
+
+                    <div id="search-grid" class="generated-grid" style="margin-top: 1rem;"></div>
+                </div>
+            </section>
+
+            <!-- ══════════════════════════════════════════════════════════════
+                 TAB 9 – 3D STRUCTURE VIEWER
+            ══════════════════════════════════════════════════════════════ -->
+            <section id="tab-viewer3d" class="tab-panel hidden">
+                <div class="input-section glass-panel fade-in slide-up">
+                    <h2>🧬 3D Structure Viewer</h2>
+                    <p class="section-desc">Interactive 3D molecule viewer with conformer generation (RDKit ETKDGv3 + MMFF94 force-field optimization).</p>
+
+                    <div style="display: flex; gap: 1.5rem; flex-wrap: wrap; align-items: flex-end; margin-top: 1rem;">
+                        <div style="flex: 1; min-width: 280px;">
+                            <label for="viewer-smiles">SMILES</label>
+                            <input type="text" id="viewer-smiles" placeholder="e.g., CC(=O)Oc1ccccc1C(=O)O" style="width:100%;">
+                        </div>
+                        <div style="min-width: 140px;">
+                            <label for="viewer-style">Render Style</label>
+                            <select id="viewer-style" style="width:100%;padding:0.6rem 1rem;">
+                                <option value="stick">Stick</option>
+                                <option value="ball">Ball &amp; Stick</option>
+                                <option value="sphere">Space-Fill</option>
+                                <option value="line">Line</option>
+                            </select>
+                        </div>
+                        <button id="viewer-btn" class="btn-primary" style="padding: 0.6rem 1.5rem;">
+                            🧬 Generate 3D
+                        </button>
+                    </div>
+                </div>
+
+                <div id="viewer-results" class="hidden slide-up" style="margin-top: 1rem;">
+                    <div class="glass-panel" style="padding: 1.5rem;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; margin-bottom: 1rem;">
+                            <span id="viewer-stats" class="gen-stats"></span>
+                            <div style="display: flex; gap: 0.5rem;">
+                                <button id="viewer-spin-btn" class="btn-secondary" style="padding: 0.4rem 0.9rem; font-size: 0.8rem;">⟳ Spin</button>
+                                <button id="viewer-reset-btn" class="btn-secondary" style="padding: 0.4rem 0.9rem; font-size: 0.8rem;">↺ Reset View</button>
+                                <button id="viewer-download-btn" class="btn-secondary" style="padding: 0.4rem 0.9rem; font-size: 0.8rem;">📥 Download PDB</button>
+                            </div>
+                        </div>
+                        <div id="viewer-3d-container" style="width:100%;height:500px;position:relative;background:radial-gradient(circle,#1a1a2e,#0f0f1f);border-radius:8px;"></div>
+                        <p style="margin-top: 0.75rem; font-size: 0.75rem; color: var(--text-muted); text-align: center;">
+                            🖱 Click &amp; drag to rotate · Scroll to zoom · Shift+drag to pan
+                        </p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ══════════════════════════════════════════════════════════════
+                 TAB 10 – DASHBOARD
+            ══════════════════════════════════════════════════════════════ -->
+            <section id="tab-dashboard" class="tab-panel hidden">
+                <div class="input-section glass-panel fade-in slide-up">
+                    <h2>📊 Analytics Dashboard</h2>
+                    <p class="section-desc">Statistics and visualizations across your prediction history. Run more predictions on the Predict or Batch tabs to populate this dashboard.</p>
+                </div>
+
+                <!-- KPI Cards -->
+                <div id="dashboard-kpis" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; margin-top: 1rem;">
+                    <div class="glass-panel kpi-card">
+                        <div class="kpi-label">Total Predictions</div>
+                        <div id="kpi-total" class="kpi-value">0</div>
+                    </div>
+                    <div class="glass-panel kpi-card">
+                        <div class="kpi-label">Mean Prediction</div>
+                        <div id="kpi-mean" class="kpi-value">—</div>
+                    </div>
+                    <div class="glass-panel kpi-card">
+                        <div class="kpi-label">Min / Max</div>
+                        <div id="kpi-range" class="kpi-value" style="font-size: 1.4rem;">—</div>
+                    </div>
+                    <div class="glass-panel kpi-card">
+                        <div class="kpi-label">Avg Uncertainty</div>
+                        <div id="kpi-uncertainty" class="kpi-value">—</div>
+                    </div>
+                </div>
+
+                <!-- Histogram -->
+                <div class="glass-panel slide-up" style="padding: 1.5rem; margin-top: 1rem;">
+                    <h3 style="margin-bottom: 1rem;">📈 Prediction Distribution</h3>
+                    <canvas id="dashboard-histogram" width="900" height="300" style="width:100%;background:rgba(0,0,0,0.2);border-radius:8px;"></canvas>
+                </div>
+
+                <!-- Trend over time -->
+                <div class="glass-panel slide-up" style="padding: 1.5rem; margin-top: 1rem;">
+                    <h3 style="margin-bottom: 1rem;">📅 Prediction Timeline</h3>
+                    <canvas id="dashboard-timeline" width="900" height="250" style="width:100%;background:rgba(0,0,0,0.2);border-radius:8px;"></canvas>
+                </div>
+            </section>
+
         </main>
 
         <footer>
@@ -494,6 +769,7 @@
         </footer>
     </div>
 
+    <script src="https://3Dmol.org/build/3Dmol-min.js"></script>
     <script src="main.js"></script>
 </body>
 </html>

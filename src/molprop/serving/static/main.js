@@ -403,6 +403,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 badgeModel.textContent = `${mData.model_type.toUpperCase()} Active`;
                 taskLabel.textContent = mData.task === "regression" ? "Predicted Value" : "Probability (Active)";
                 predictBtn.disabled = false;
+                document.dispatchEvent(new Event("model-ready"));
             } else {
                 badgeModel.textContent = "GNN Not Loaded";
                 badgeModel.className = "badge badge-red";
@@ -424,6 +425,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 if (optimizeBtn) optimizeBtn.disabled = false;
                 if (paretoBtn) paretoBtn.disabled = false;
                 if (vizBtn) vizBtn.disabled = false;
+                document.dispatchEvent(new Event("vae-ready"));
             } else {
                 badgeVae.textContent = "VAE Inactive";
                 badgeVae.style.opacity = "0.5";
@@ -1023,6 +1025,647 @@ document.addEventListener("DOMContentLoaded", () => {
             }
         });
     }
+
+    // ── Batch Prediction Tab ────────────────────────────────────────────────
+    const batchTextarea = document.getElementById("batch-textarea");
+    const batchFile = document.getElementById("batch-file");
+    const batchBtn = document.getElementById("batch-btn");
+    const batchExplain = document.getElementById("batch-explain");
+    const batchResults = document.getElementById("batch-results");
+    const batchStats = document.getElementById("batch-stats");
+    const batchTable = document.getElementById("batch-table");
+    const batchExportBtn = document.getElementById("batch-export-btn");
+    const batchClearBtn = document.getElementById("batch-clear-btn");
+
+    let lastBatchResults = [];
+
+    function parseCSV(text) {
+        const lines = text.split(/\r?\n/).filter(l => l.trim());
+        // Try to find SMILES column
+        const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+        const smilesIdx = headers.findIndex(h => h.includes('smiles') || h.includes('molecule'));
+        const idx = smilesIdx >= 0 ? smilesIdx : 0;
+        return lines.slice(1).map(line => {
+            const cols = line.split(',').map(c => c.trim());
+            return cols[idx] || '';
+        }).filter(s => s);
+    }
+
+    function updateBatchButton() {
+        const hasText = batchTextarea?.value.trim().length > 0;
+        if (batchBtn) batchBtn.disabled = !hasText;
+    }
+
+    if (batchTextarea) {
+        batchTextarea.addEventListener("input", updateBatchButton);
+    }
+
+    if (batchFile) {
+        batchFile.addEventListener("change", (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (ev) => {
+                try {
+                    const text = ev.target.result;
+                    const smiles = file.name.endsWith('.csv') ? parseCSV(text) : text.split(/\r?\n/).filter(l => l.trim());
+                    if (batchTextarea) batchTextarea.value = smiles.join('\n');
+                    updateBatchButton();
+                } catch (err) {
+                    alert("Failed to parse file: " + err.message);
+                }
+            };
+            reader.readAsText(file);
+        });
+    }
+
+    if (batchBtn) {
+        batchBtn.addEventListener("click", async () => {
+            const raw = batchTextarea?.value || '';
+            const smilesList = raw.split(/\r?\n/).map(s => s.trim()).filter(s => s);
+            if (smilesList.length === 0) { alert("Enter at least one SMILES"); return; }
+            if (smilesList.length > 100) { alert("Maximum 100 molecules per batch"); return; }
+
+            batchBtn.disabled = true;
+            batchBtn.textContent = "⏳ Predicting…";
+            batchResults.classList.add("hidden");
+
+            try {
+                const resp = await fetch("/predict/batch", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        smiles_list: smilesList,
+                        explain: batchExplain?.checked || false
+                    })
+                });
+                const data = await resp.json();
+                if (!resp.ok) throw new Error(data.detail || "Batch prediction failed");
+
+                lastBatchResults = data;
+                const tbody = batchTable?.querySelector("tbody");
+                if (tbody) {
+                    tbody.innerHTML = '';
+                    data.forEach((row, i) => {
+                        const tr = document.createElement("tr");
+                        const status = row.error
+                            ? '<span style="color:#f87171;">Error</span>'
+                            : '<span style="color:#10b981;">OK</span>';
+                        const pred = row.error ? '—' : (Number.isInteger(row.predictions?.task_1) ? row.predictions.task_1 : row.predictions?.task_1?.toFixed(4) || '—');
+                        const unc = row.error ? '—' : (row.uncertainty_std?.task_1 ? `±${row.uncertainty_std.task_1.toFixed(4)}` : '—');
+                        tr.innerHTML = `
+                            <td>${i + 1}</td>
+                            <td style="font-family:monospace;font-size:0.8rem;max-width:300px;overflow:hidden;text-overflow:ellipsis;">${row.smiles}</td>
+                            <td>${pred}</td>
+                            <td>${unc}</td>
+                            <td>${status}</td>
+                            <td>
+                                <button class="btn-secondary" style="padding:0.3rem 0.6rem;font-size:0.75rem;"
+                                        onclick="useBatchSmiles('${row.smiles.replace(/'/g, "\\'")}')">Use</button>
+                            </td>
+                        `;
+                        tbody.appendChild(tr);
+                    });
+                }
+
+                const successCount = data.filter(r => !r.error).length;
+                batchStats.textContent = `${successCount}/${data.length} successful predictions`;
+                batchResults.classList.remove("hidden");
+            } catch (err) {
+                alert(err.message);
+            } finally {
+                batchBtn.disabled = false;
+                batchBtn.textContent = "🔮 Predict Batch";
+            }
+        });
+    }
+
+    // Global handler for "Use" button in batch table
+    window.useBatchSmiles = (smiles) => {
+        smilesInput.value = smiles;
+        document.querySelector('[data-tab="predict"]').click();
+        predictBtn.click();
+    };
+
+    if (batchExportBtn) {
+        batchExportBtn.addEventListener("click", () => {
+            if (!lastBatchResults.length) { alert("No results to export"); return; }
+            const headers = ["SMILES", "Prediction", "Uncertainty", "Standardized_SMILES", "Error"];
+            const rows = lastBatchResults.map(r => [
+                r.smiles,
+                r.predictions?.task_1 ?? '',
+                r.uncertainty_std?.task_1 ?? '',
+                r.standardized_smiles ?? '',
+                r.error ?? ''
+            ]);
+            const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+            const blob = new Blob([csv], { type: "text/csv" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = `batch_predictions_${new Date().toISOString().slice(0,10)}.csv`;
+            a.click();
+            URL.revokeObjectURL(url);
+        });
+    }
+
+    if (batchClearBtn) {
+        batchClearBtn.addEventListener("click", () => {
+            if (batchTextarea) batchTextarea.value = '';
+            if (batchFile) batchFile.value = '';
+            batchResults.classList.add("hidden");
+            lastBatchResults = [];
+            updateBatchButton();
+        });
+    }
+
+    // Enable batch button when model is loaded
+    document.addEventListener("model-ready", () => {
+        if (batchBtn) batchBtn.disabled = false;
+    });
+
+    // ── Similarity Search Tab ────────────────────────────────────────────────
+    const searchBtn = document.getElementById("search-btn");
+    const searchSmiles = document.getElementById("search-smiles");
+    const searchFp = document.getElementById("search-fp");
+    const searchTopk = document.getElementById("search-topk");
+    const searchThreshold = document.getElementById("search-threshold");
+    const searchResults = document.getElementById("search-results");
+    const searchStats = document.getElementById("search-stats");
+    const searchGrid = document.getElementById("search-grid");
+
+    function updateSearchButton() {
+        if (searchBtn) searchBtn.disabled = !(searchSmiles?.value.trim());
+    }
+
+    if (searchSmiles) {
+        searchSmiles.addEventListener("input", updateSearchButton);
+    }
+
+    if (searchBtn) {
+        searchBtn.addEventListener("click", async () => {
+            const smiles = searchSmiles?.value.trim();
+            if (!smiles) return;
+
+            searchBtn.disabled = true;
+            searchBtn.textContent = "⏳ Searching…";
+            searchResults.classList.add("hidden");
+
+            try {
+                const resp = await fetch("/search/similar", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        smiles: smiles,
+                        fingerprint_type: searchFp?.value || "morgan",
+                        top_k: parseInt(searchTopk?.value || 10),
+                        threshold: parseFloat(searchThreshold?.value || 0.5)
+                    })
+                });
+                const data = await resp.json();
+                if (!resp.ok) throw new Error(data.detail || "Search failed");
+
+                searchStats.textContent = `${data.results.length} matches from ${data.total_indexed} indexed molecules`;
+
+                searchGrid.innerHTML = '';
+                if (data.results.length === 0) {
+                    searchGrid.innerHTML = '<p style="color:var(--text-muted);text-align:center;padding:2rem;">No similar molecules found above threshold.</p>';
+                } else {
+                    data.results.forEach((r, i) => {
+                        const card = document.createElement("div");
+                        card.className = "gen-mol-card slide-up";
+                        const simColor = r.score > 0.7 ? "#10b981" : r.score > 0.5 ? "#fbbf24" : "#94a3b8";
+                        card.innerHTML = `
+                            <span class="gen-badge" style="background:${simColor}20;color:${simColor};border:1px solid ${simColor};">Rank #${r.rank} • Tanimoto ${r.score.toFixed(3)}</span>
+                            <div class="analog-smiles" style="font-size:0.8rem;color:white;margin:0.75rem 0;">${r.smiles}</div>
+                            <button class="btn-primary" style="padding:0.4rem;font-size:0.75rem;"
+                                    onclick="useBatchSmiles('${r.smiles.replace(/'/g, "\\'")}')">Predict</button>
+                            <button class="btn-secondary" style="padding:0.4rem;font-size:0.75rem;margin-left:0.3rem;"
+                                    onclick="window.admetFromSearch('${r.smiles.replace(/'/g, "\\'")}')">ADMET</button>
+                        `;
+                        searchGrid.appendChild(card);
+                    });
+                }
+
+                searchResults.classList.remove("hidden");
+            } catch (err) {
+                alert(err.message);
+            } finally {
+                searchBtn.disabled = false;
+                searchBtn.textContent = "🔍 Search";
+            }
+        });
+    }
+
+    window.admetFromSearch = (smiles) => {
+        if (admetSmilesInput) admetSmilesInput.value = smiles;
+        document.querySelector('[data-tab="admet"]').click();
+        if (admetBtn) admetBtn.click();
+    };
+
+    // Prefill search from last predicted
+    document.querySelector('[data-tab="search"]')?.addEventListener("click", () => {
+        if (lastPredictedSmiles && searchSmiles && !searchSmiles.value) {
+            searchSmiles.value = lastPredictedSmiles;
+            updateSearchButton();
+        }
+    });
+
+    // ── 3D Structure Viewer Tab ──────────────────────────────────────────────
+    const viewerBtn = document.getElementById("viewer-btn");
+    const viewerSmiles = document.getElementById("viewer-smiles");
+    const viewerStyle = document.getElementById("viewer-style");
+    const viewerResults = document.getElementById("viewer-results");
+    const viewerStats = document.getElementById("viewer-stats");
+    const viewerContainer = document.getElementById("viewer-3d-container");
+    const viewerSpinBtn = document.getElementById("viewer-spin-btn");
+    const viewerResetBtn = document.getElementById("viewer-reset-btn");
+    const viewerDownloadBtn = document.getElementById("viewer-download-btn");
+
+    let viewer3D = null;
+    let lastPdbBlock = null;
+    let lastViewerSmiles = null;
+    let isSpinning = false;
+
+    function applyViewerStyle(style) {
+        if (!viewer3D) return;
+        viewer3D.removeAllShapes();
+        let styleObj;
+        if (style === "stick") {
+            styleObj = { stick: { radius: 0.15, colorscheme: "Jmol" } };
+        } else if (style === "ball") {
+            styleObj = { stick: { radius: 0.15, colorscheme: "Jmol" }, sphere: { scale: 0.25, colorscheme: "Jmol" } };
+        } else if (style === "sphere") {
+            styleObj = { sphere: { scale: 0.85, colorscheme: "Jmol" } };
+        } else {
+            styleObj = { line: { linewidth: 2, colorscheme: "Jmol" } };
+        }
+        viewer3D.setStyle({}, styleObj);
+        viewer3D.render();
+    }
+
+    if (viewerBtn) {
+        viewerBtn.addEventListener("click", async () => {
+            const smiles = viewerSmiles?.value.trim();
+            if (!smiles) { alert("Enter a SMILES string"); return; }
+            if (typeof $3Dmol === "undefined") {
+                alert("3Dmol.js failed to load. Check internet connection.");
+                return;
+            }
+
+            viewerBtn.disabled = true;
+            viewerBtn.textContent = "⏳ Generating…";
+            viewerResults.classList.add("hidden");
+
+            try {
+                const resp = await fetch("/conformer", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ smiles })
+                });
+                const data = await resp.json();
+                if (!resp.ok || data.error) throw new Error(data.error || data.detail || "Conformer generation failed");
+                if (!data.pdb_block) throw new Error("No PDB block returned");
+
+                lastPdbBlock = data.pdb_block;
+                lastViewerSmiles = smiles;
+                viewerStats.textContent = `${data.num_atoms} atoms • ETKDGv3 + MMFF94 optimized`;
+
+                // Initialize 3Dmol viewer
+                viewerContainer.innerHTML = '';
+                viewer3D = $3Dmol.createViewer(viewerContainer, {
+                    backgroundColor: "rgb(15, 15, 31)"
+                });
+                viewer3D.addModel(data.pdb_block, "pdb");
+                applyViewerStyle(viewerStyle?.value || "stick");
+                viewer3D.zoomTo();
+                viewer3D.render();
+                isSpinning = false;
+                viewerSpinBtn.textContent = "⟳ Spin";
+
+                viewerResults.classList.remove("hidden");
+            } catch (err) {
+                alert(err.message);
+            } finally {
+                viewerBtn.disabled = false;
+                viewerBtn.textContent = "🧬 Generate 3D";
+            }
+        });
+    }
+
+    if (viewerStyle) {
+        viewerStyle.addEventListener("change", () => applyViewerStyle(viewerStyle.value));
+    }
+
+    if (viewerSpinBtn) {
+        viewerSpinBtn.addEventListener("click", () => {
+            if (!viewer3D) return;
+            if (isSpinning) {
+                viewer3D.spin(false);
+                viewerSpinBtn.textContent = "⟳ Spin";
+            } else {
+                viewer3D.spin("y", 1);
+                viewerSpinBtn.textContent = "⏹ Stop";
+            }
+            isSpinning = !isSpinning;
+        });
+    }
+
+    if (viewerResetBtn) {
+        viewerResetBtn.addEventListener("click", () => {
+            if (viewer3D) {
+                viewer3D.zoomTo();
+                viewer3D.render();
+            }
+        });
+    }
+
+    if (viewerDownloadBtn) {
+        viewerDownloadBtn.addEventListener("click", () => {
+            if (!lastPdbBlock) { alert("No structure to download"); return; }
+            const blob = new Blob([lastPdbBlock], { type: "chemical/x-pdb" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            const safeName = (lastViewerSmiles || "molecule").replace(/[^a-zA-Z0-9]/g, "_").slice(0, 30);
+            a.href = url;
+            a.download = `${safeName}.pdb`;
+            a.click();
+            URL.revokeObjectURL(url);
+        });
+    }
+
+    // Prefill from last predicted SMILES
+    document.querySelector('[data-tab="viewer3d"]')?.addEventListener("click", () => {
+        if (lastPredictedSmiles && viewerSmiles && !viewerSmiles.value) {
+            viewerSmiles.value = lastPredictedSmiles;
+        }
+    });
+
+    // ── Smart Generate (Property-Targeted) ──────────────────────────────────
+    const smartGenBtn = document.getElementById("smart-gen-btn");
+    const smartResultsPanel = document.getElementById("smart-results-panel");
+    const smartGrid = document.getElementById("smart-grid");
+    const smartStats = document.getElementById("smart-stats");
+
+    function readSmartTargets() {
+        const targets = {};
+        const map = [
+            { key: "mw", on: "smart-mw-on", min: "smart-mw-min", max: "smart-mw-max" },
+            { key: "logp", on: "smart-logp-on", min: "smart-logp-min", max: "smart-logp-max" },
+            { key: "qed", on: "smart-qed-on", min: "smart-qed-min", max: "smart-qed-max" },
+            { key: "tpsa", on: "smart-tpsa-on", min: "smart-tpsa-min", max: "smart-tpsa-max" },
+        ];
+        for (const m of map) {
+            const onEl = document.getElementById(m.on);
+            if (!onEl?.checked) continue;
+            const lo = parseFloat(document.getElementById(m.min).value);
+            const hi = parseFloat(document.getElementById(m.max).value);
+            if (!isNaN(lo) && !isNaN(hi)) targets[m.key] = [lo, hi];
+        }
+        return targets;
+    }
+
+    if (smartGenBtn) {
+        smartGenBtn.addEventListener("click", async () => {
+            const targets = readSmartTargets();
+            if (Object.keys(targets).length === 0) {
+                alert("Enable at least one property target");
+                return;
+            }
+
+            smartGenBtn.disabled = true;
+            smartGenBtn.textContent = "⏳ Sampling…";
+            smartResultsPanel.classList.add("hidden");
+
+            try {
+                const resp = await fetch("/generate/smart", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        n_target: parseInt(document.getElementById("smart-n-target").value),
+                        max_attempts: parseInt(document.getElementById("smart-max-attempts").value),
+                        temperature: 0.9,
+                        targets: targets
+                    })
+                });
+                const data = await resp.json();
+                if (!resp.ok) throw new Error(data.detail || "Smart generation failed");
+
+                smartStats.textContent =
+                    `${data.n_accepted} accepted from ${data.n_attempts} samples ` +
+                    `(${(data.acceptance_rate * 100).toFixed(1)}% acceptance)`;
+
+                smartGrid.innerHTML = '';
+                if (data.molecules.length === 0) {
+                    smartGrid.innerHTML = '<p style="color:var(--text-muted);text-align:center;padding:2rem;">No molecules matched criteria. Try relaxing constraints or increasing max attempts.</p>';
+                } else {
+                    data.molecules.forEach(mol => {
+                        const card = document.createElement("div");
+                        card.className = "gen-mol-card slide-up";
+                        const propEntries = Object.entries(mol.properties || {})
+                            .filter(([k]) => ["mw","logp","tpsa","qed","hbd","hba"].includes(k))
+                            .map(([k, v]) => `<div style="font-size:0.7rem;color:#94a3b8;">${k}: ${v}</div>`)
+                            .join('');
+                        card.innerHTML = `
+                            <span class="gen-badge" style="background:linear-gradient(135deg,#10b981,#06b6d4);">✓ Match</span>
+                            <div class="analog-smiles" style="font-size:0.8rem;color:white;margin:0.5rem 0;">${mol.smiles}</div>
+                            <div>${propEntries}</div>
+                            <button class="btn-primary" style="padding:0.4rem;font-size:0.7rem;margin-top:0.5rem;"
+                                    onclick="useBatchSmiles('${mol.smiles.replace(/'/g, "\\'")}')">Predict</button>
+                        `;
+                        smartGrid.appendChild(card);
+                    });
+                }
+                smartResultsPanel.classList.remove("hidden");
+            } catch (err) {
+                alert(err.message);
+            } finally {
+                smartGenBtn.disabled = false;
+                smartGenBtn.textContent = "🎯 Smart Generate";
+            }
+        });
+    }
+
+    // Enable smart generate when VAE is ready
+    document.addEventListener("vae-ready", () => {
+        if (smartGenBtn) smartGenBtn.disabled = false;
+    });
+
+    // ── Dashboard Tab ────────────────────────────────────────────────────────
+    const kpiTotal = document.getElementById("kpi-total");
+    const kpiMean = document.getElementById("kpi-mean");
+    const kpiRange = document.getElementById("kpi-range");
+    const kpiUncertainty = document.getElementById("kpi-uncertainty");
+    const histCanvas = document.getElementById("dashboard-histogram");
+    const timelineCanvas = document.getElementById("dashboard-timeline");
+
+    function drawHistogram(canvas, values) {
+        if (!canvas || !values.length) return;
+        const ctx = canvas.getContext("2d");
+        const W = canvas.width, H = canvas.height;
+        ctx.clearRect(0, 0, W, H);
+
+        const numBins = 12;
+        const min = Math.min(...values);
+        const max = Math.max(...values);
+        const range = max - min || 1;
+        const binSize = range / numBins;
+        const bins = new Array(numBins).fill(0);
+        values.forEach(v => {
+            const idx = Math.min(Math.floor((v - min) / binSize), numBins - 1);
+            bins[idx]++;
+        });
+        const maxCount = Math.max(...bins);
+
+        const padL = 50, padR = 20, padT = 20, padB = 40;
+        const plotW = W - padL - padR;
+        const plotH = H - padT - padB;
+        const barW = plotW / numBins;
+
+        // Axes
+        ctx.strokeStyle = "rgba(255,255,255,0.2)";
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(padL, padT);
+        ctx.lineTo(padL, H - padB);
+        ctx.lineTo(W - padR, H - padB);
+        ctx.stroke();
+
+        // Bars
+        bins.forEach((count, i) => {
+            const h = (count / maxCount) * plotH;
+            const x = padL + i * barW;
+            const y = H - padB - h;
+            const grad = ctx.createLinearGradient(0, y, 0, H - padB);
+            grad.addColorStop(0, "#8b5cf6");
+            grad.addColorStop(1, "#6366f1");
+            ctx.fillStyle = grad;
+            ctx.fillRect(x + 2, y, barW - 4, h);
+
+            // Count label
+            if (count > 0) {
+                ctx.fillStyle = "#cbd5e1";
+                ctx.font = "11px sans-serif";
+                ctx.textAlign = "center";
+                ctx.fillText(count, x + barW / 2, y - 4);
+            }
+        });
+
+        // X axis labels (min, mid, max)
+        ctx.fillStyle = "#94a3b8";
+        ctx.font = "11px sans-serif";
+        ctx.textAlign = "center";
+        ctx.fillText(min.toFixed(2), padL, H - padB + 18);
+        ctx.fillText(((min + max) / 2).toFixed(2), padL + plotW / 2, H - padB + 18);
+        ctx.fillText(max.toFixed(2), W - padR, H - padB + 18);
+
+        ctx.textAlign = "left";
+        ctx.fillStyle = "#cbd5e1";
+        ctx.font = "12px sans-serif";
+        ctx.fillText("Frequency", 10, padT + 10);
+        ctx.fillText("Predicted Value", padL + plotW / 2 - 40, H - 8);
+    }
+
+    function drawTimeline(canvas, points) {
+        if (!canvas || !points.length) return;
+        const ctx = canvas.getContext("2d");
+        const W = canvas.width, H = canvas.height;
+        ctx.clearRect(0, 0, W, H);
+
+        const padL = 50, padR = 20, padT = 20, padB = 30;
+        const plotW = W - padL - padR;
+        const plotH = H - padT - padB;
+
+        const values = points.map(p => p.value);
+        const min = Math.min(...values);
+        const max = Math.max(...values);
+        const range = max - min || 1;
+
+        // Axes
+        ctx.strokeStyle = "rgba(255,255,255,0.2)";
+        ctx.beginPath();
+        ctx.moveTo(padL, padT);
+        ctx.lineTo(padL, H - padB);
+        ctx.lineTo(W - padR, H - padB);
+        ctx.stroke();
+
+        // Line
+        ctx.strokeStyle = "#8b5cf6";
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        points.forEach((p, i) => {
+            const x = padL + (i / Math.max(1, points.length - 1)) * plotW;
+            const y = H - padB - ((p.value - min) / range) * plotH;
+            if (i === 0) ctx.moveTo(x, y);
+            else ctx.lineTo(x, y);
+        });
+        ctx.stroke();
+
+        // Dots
+        points.forEach((p, i) => {
+            const x = padL + (i / Math.max(1, points.length - 1)) * plotW;
+            const y = H - padB - ((p.value - min) / range) * plotH;
+            ctx.fillStyle = "#a78bfa";
+            ctx.beginPath();
+            ctx.arc(x, y, 4, 0, Math.PI * 2);
+            ctx.fill();
+        });
+
+        // Y labels
+        ctx.fillStyle = "#94a3b8";
+        ctx.font = "11px sans-serif";
+        ctx.textAlign = "right";
+        ctx.fillText(max.toFixed(2), padL - 6, padT + 4);
+        ctx.fillText(min.toFixed(2), padL - 6, H - padB);
+
+        ctx.textAlign = "center";
+        ctx.fillText(`Earliest`, padL + 20, H - padB + 18);
+        ctx.fillText(`Latest`, W - padR - 20, H - padB + 18);
+    }
+
+    function refreshDashboard() {
+        const h = loadHistory();
+        const validPredictions = h.filter(e => typeof e.prediction === 'number');
+
+        kpiTotal.textContent = h.length;
+
+        if (validPredictions.length === 0) {
+            kpiMean.textContent = "—";
+            kpiRange.textContent = "—";
+            kpiUncertainty.textContent = "—";
+            const hctx = histCanvas?.getContext("2d");
+            if (hctx) hctx.clearRect(0, 0, histCanvas.width, histCanvas.height);
+            const tctx = timelineCanvas?.getContext("2d");
+            if (tctx) tctx.clearRect(0, 0, timelineCanvas.width, timelineCanvas.height);
+            return;
+        }
+
+        const values = validPredictions.map(e => e.prediction);
+        const mean = values.reduce((a, b) => a + b, 0) / values.length;
+        const minV = Math.min(...values);
+        const maxV = Math.max(...values);
+
+        kpiMean.textContent = mean.toFixed(3);
+        kpiRange.textContent = `${minV.toFixed(2)} / ${maxV.toFixed(2)}`;
+
+        const uncertainties = validPredictions
+            .map(e => e.uncertainty)
+            .filter(u => typeof u === 'number');
+        if (uncertainties.length) {
+            const meanU = uncertainties.reduce((a, b) => a + b, 0) / uncertainties.length;
+            kpiUncertainty.textContent = `±${meanU.toFixed(3)}`;
+        } else {
+            kpiUncertainty.textContent = "—";
+        }
+
+        drawHistogram(histCanvas, values);
+        // Reverse history so earliest is first for timeline
+        const timelinePoints = [...validPredictions].reverse().map(e => ({ value: e.prediction }));
+        drawTimeline(timelineCanvas, timelinePoints);
+    }
+
+    // Refresh dashboard when its tab is opened
+    document.querySelector('[data-tab="dashboard"]')?.addEventListener("click", refreshDashboard);
 
     // Enter key support
     smilesInput.addEventListener("keypress", (e) => { if (e.key === "Enter") predictBtn.click(); });

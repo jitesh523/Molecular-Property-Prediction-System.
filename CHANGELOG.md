@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.4.0] - 2026-05-15
+
+### Added — 5 major UI/API upgrades
+- **📁 Batch Predictions tab** — Paste multiple SMILES (one per line) or upload a CSV file (auto-detects SMILES column). Returns sortable table with per-row "Use" action and CSV export.
+- **🔍 Fingerprint Similarity Search** — `POST /search/similar` endpoint using Morgan (ECFP, 2048-bit) or MACCS fingerprints with Tanimoto coefficient. Configurable top-K and threshold. Color-coded similarity badges in results grid.
+- **🧬 3D Structure Viewer** — Interactive 3Dmol.js viewer with conformer generation (RDKit ETKDGv3 + MMFF94). Stick / Ball-and-Stick / Space-Fill / Line render styles. Spin animation, reset view, and PDB download.
+- **📊 Analytics Dashboard** — KPI cards (total predictions, mean, min/max range, avg uncertainty) and vanilla canvas charts: prediction distribution histogram (12 bins, gradient-filled) and timeline trend chart. Auto-refreshes from `localStorage` history.
+- **🎯 Smart Generation** — `POST /generate/smart` endpoint samples molecules and filters by property ranges (MW, LogP, QED, TPSA). Reports acceptance rate and supports up to 2000 attempts per request.
+
+### Other
+- Custom events `model-ready` and `vae-ready` to unify button activation.
+- Auto-prefill of SMILES inputs across tabs from last predicted molecule.
+
 ## [2.3.0] - 2026-05-14
 
 ### Added

@@ -475,3 +475,24 @@ select:focus {
 .admet-pass { color: #10b981; }
 .admet-fail { color: #f87171; }
 .admet-warn { color: #fbbf24; }
+
+/* Dashboard KPI cards */
+.kpi-card {
+    padding: 1.25rem 1.5rem;
+    text-align: left;
+}
+
+.kpi-label {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-bottom: 0.5rem;
+}
+
+.kpi-value {
+    font-size: 1.8rem;
+    font-weight: 800;
+    color: var(--primary-hover);
+    line-height: 1.1;
+}

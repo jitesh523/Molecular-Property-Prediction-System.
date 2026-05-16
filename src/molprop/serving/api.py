@@ -36,6 +36,7 @@ from molprop.features.conformers import generate_3d_conformer, mol_to_pdb
 from molprop.features.descriptors import get_descriptor_names, smiles_to_descriptors
 from molprop.features.fingerprints import smiles_to_maccs, tanimoto_similarity
 from molprop.features.graphs import smiles_to_graph
+from molprop.features.scaffolds import analyze_scaffold
 from molprop.models.explain import explain_graph, get_explainer
 from molprop.models.optimization import LatentOptimizer
 from molprop.models.pareto import ParetoOptimizer
@@ -1205,6 +1206,35 @@ async def fingerprint_similarity_search(req: SimilaritySearchRequest):
             for i, r in enumerate(top_results)
         ],
     }
+
+
+# ── Scaffold Analysis & Synthetic Accessibility ──────────────────────────────
+
+
+class ScaffoldRequest(BaseModel):
+    smiles: str = Field(..., max_length=MAX_SMILES_LEN)
+
+
+@app.post("/scaffold", tags=["Cheminformatics"])
+async def scaffold_analysis(req: ScaffoldRequest):
+    """
+    Compute Bemis–Murcko scaffold, generic Murcko, ring metrics,
+    and a synthetic accessibility score (1=easy → 10=hard).
+    """
+    result = analyze_scaffold(req.smiles)
+    if result is None:
+        raise HTTPException(status_code=422, detail=f"Invalid SMILES: '{req.smiles}'")
+    return result.to_dict()
+
+
+@app.post("/scaffold/batch", tags=["Cheminformatics"])
+async def scaffold_batch(req: BatchPredictRequest):
+    """Compute scaffold analysis for a batch of SMILES."""
+    results = []
+    for smi in req.smiles_list[:MAX_BATCH_SIZE]:
+        r = analyze_scaffold(smi)
+        results.append(r.to_dict() if r else {"smiles": smi, "error": "Invalid SMILES"})
+    return {"results": results, "count": len(results)}
 
 
 # ── Compound Library Endpoints ────────────────────────────────────────────────

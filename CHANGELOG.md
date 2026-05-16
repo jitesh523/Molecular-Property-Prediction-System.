@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.6.0] - 2026-05-16
+
+### Added — 🦴 Scaffold Analysis & Synthetic Accessibility
+- New module `src/molprop/features/scaffolds.py` with `analyze_scaffold()` returning a `ScaffoldAnalysis` dataclass.
+- **Bemis–Murcko scaffold** extraction (rings + linkers) and **Generic Murcko framework** (atoms reduced to C, bonds to single).
+- Ring topology metrics: total rings, aromatic / aliphatic split, largest ring size, spiro atoms, bridgehead atoms, macrocycle detection.
+- **Synthetic Accessibility Score** (1.0 easy → 10.0 hard): combines ECFP4 fragment diversity, heavy-atom log-size penalty, stereocenter / spiro / bridgehead / macrocycle penalties. Lightweight reimplementation of the Ertl–Schuffenhauer heuristic — no contrib data file needed.
+- New endpoints: `POST /scaffold` and `POST /scaffold/batch`.
+- New **🦴 Scaffold tab** in UI: gradient SAScore meter (green→yellow→red) with class badge, side-by-side scaffold display, 7-card ring topology grid.
+
 ## [2.5.0] - 2026-05-16
 
 ### Added — 📚 Compound Library (persistent storage)

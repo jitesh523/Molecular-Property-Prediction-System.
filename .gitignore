@@ -67,3 +67,4 @@ results/*.json
 results/explanations/
 results/hpo/
 mlruns/
+data/library.db

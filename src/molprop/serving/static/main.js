@@ -1869,6 +1869,79 @@ document.addEventListener("DOMContentLoaded", () => {
     const resultEl = document.getElementById("result");
     if (resultEl) origObserver.observe(resultEl, { attributes: true, attributeFilter: ["class"] });
 
+    // ── Scaffold Analysis Tab ───────────────────────────────────────────────
+    const scaffoldBtn = document.getElementById("scaffold-btn");
+    const scaffoldSmilesIn = document.getElementById("scaffold-smiles");
+    const scaffoldResults = document.getElementById("scaffold-results");
+
+    if (scaffoldBtn) {
+        scaffoldBtn.addEventListener("click", async () => {
+            const smiles = scaffoldSmilesIn.value.trim();
+            if (!smiles) { alert("Enter a SMILES string"); return; }
+
+            scaffoldBtn.disabled = true;
+            scaffoldBtn.textContent = "⏳ Analyzing…";
+            scaffoldResults.classList.add("hidden");
+
+            try {
+                const resp = await fetch("/scaffold", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ smiles })
+                });
+                const data = await resp.json();
+                if (!resp.ok) throw new Error(data.detail || "Analysis failed");
+
+                // SA score
+                const saScore = data.sa_score;
+                document.getElementById("sa-score-value").textContent = saScore.toFixed(2);
+
+                const colors = {
+                    easy: { bg: "rgba(16,185,129,0.2)", fg: "#10b981" },
+                    moderate: { bg: "rgba(251,191,36,0.2)", fg: "#fbbf24" },
+                    hard: { bg: "rgba(248,113,113,0.2)", fg: "#f87171" }
+                };
+                const c = colors[data.sa_class] || colors.moderate;
+                const badge = document.getElementById("sa-class-badge");
+                badge.textContent = data.sa_class.toUpperCase();
+                badge.style.background = c.bg;
+                badge.style.color = c.fg;
+                document.getElementById("sa-score-value").style.color = c.fg;
+
+                // Marker (1-10 mapped to 0-100%)
+                const markerPct = ((saScore - 1) / 9) * 100;
+                document.getElementById("sa-marker").style.left = `calc(${Math.max(0, Math.min(100, markerPct))}% - 2px)`;
+
+                // Scaffolds
+                document.getElementById("scaffold-murcko").textContent = data.murcko_smiles || "(no rings)";
+                document.getElementById("scaffold-generic").textContent = data.generic_murcko_smiles || "(no rings)";
+
+                // Ring metrics
+                document.getElementById("ring-total").textContent = data.num_rings;
+                document.getElementById("ring-arom").textContent = data.num_aromatic_rings;
+                document.getElementById("ring-aliph").textContent = data.num_aliphatic_rings;
+                document.getElementById("ring-largest").textContent = data.largest_ring_size;
+                document.getElementById("ring-spiro").textContent = data.num_spiro_atoms;
+                document.getElementById("ring-bridge").textContent = data.num_bridgehead_atoms;
+                document.getElementById("ring-macro").textContent = data.has_macrocycle ? "Yes" : "No";
+
+                scaffoldResults.classList.remove("hidden");
+            } catch (err) {
+                alert(err.message);
+            } finally {
+                scaffoldBtn.disabled = false;
+                scaffoldBtn.textContent = "🦴 Analyze";
+            }
+        });
+    }
+
+    // Prefill scaffold SMILES from last predicted
+    document.querySelector('[data-tab="scaffold"]')?.addEventListener("click", () => {
+        if (lastPredictedSmiles && scaffoldSmilesIn && !scaffoldSmilesIn.value) {
+            scaffoldSmilesIn.value = lastPredictedSmiles;
+        }
+    });
+
     // Enter key support
     smilesInput.addEventListener("keypress", (e) => { if (e.key === "Enter") predictBtn.click(); });
 });

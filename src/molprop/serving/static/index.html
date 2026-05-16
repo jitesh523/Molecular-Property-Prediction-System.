@@ -58,6 +58,9 @@
             <button class="tab-btn" data-tab="library">
                 <span class="tab-icon">📚</span> Library
             </button>
+            <button class="tab-btn" data-tab="scaffold">
+                <span class="tab-icon">🦴</span> Scaffold
+            </button>
         </nav>
 
         <main>
@@ -832,6 +835,93 @@
                     <p id="lib-empty" class="hidden" style="text-align:center;padding:2rem;color:var(--text-muted);">
                         No compounds yet — save one above to get started.
                     </p>
+                </div>
+            </section>
+
+            <!-- ══════════════════════════════════════════════════════════════
+                 TAB 12 – SCAFFOLD ANALYSIS
+            ══════════════════════════════════════════════════════════════ -->
+            <section id="tab-scaffold" class="tab-panel hidden">
+                <div class="input-section glass-panel fade-in slide-up">
+                    <h2>🦴 Scaffold &amp; Synthetic Accessibility</h2>
+                    <p class="section-desc">Bemis–Murcko scaffold extraction, ring topology analysis, and synthetic accessibility scoring (SAScore: 1 = easy synthesis → 10 = hard).</p>
+
+                    <div style="display: flex; gap: 1rem; align-items: flex-end; flex-wrap: wrap; margin-top: 1rem;">
+                        <div style="flex: 1; min-width: 280px;">
+                            <label for="scaffold-smiles">SMILES</label>
+                            <input type="text" id="scaffold-smiles" placeholder="e.g., CC(=O)Oc1ccccc1C(=O)O" style="width:100%;">
+                        </div>
+                        <button id="scaffold-btn" class="btn-primary" style="padding:0.6rem 1.5rem;">🦴 Analyze</button>
+                    </div>
+                </div>
+
+                <div id="scaffold-results" class="hidden slide-up" style="margin-top: 1rem;">
+                    <!-- Top: SA Score badge -->
+                    <div class="glass-panel" style="padding: 1.5rem; text-align: center;">
+                        <div style="font-size: 0.85rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.1em;">Synthetic Accessibility</div>
+                        <div style="display: flex; align-items: baseline; justify-content: center; gap: 0.75rem; margin-top: 0.5rem;">
+                            <div id="sa-score-value" style="font-size: 3.5rem; font-weight: 800; line-height: 1;">—</div>
+                            <div style="color: var(--text-muted); font-size: 1rem;">/ 10</div>
+                            <div id="sa-class-badge" style="padding: 0.3rem 0.8rem; border-radius: 20px; font-weight: 600; font-size: 0.85rem;">—</div>
+                        </div>
+                        <!-- Visual scale -->
+                        <div style="margin-top: 1.25rem; height: 10px; border-radius: 5px; background: linear-gradient(90deg, #10b981 0%, #fbbf24 50%, #f87171 100%); position: relative;">
+                            <div id="sa-marker" style="position: absolute; top: -3px; width: 4px; height: 16px; background: white; border-radius: 2px; box-shadow: 0 0 6px rgba(255,255,255,0.6); transition: left 0.3s;"></div>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; margin-top: 0.4rem; font-size: 0.7rem; color: var(--text-muted);">
+                            <span>Easy</span><span>Moderate</span><span>Hard</span>
+                        </div>
+                    </div>
+
+                    <!-- Scaffolds -->
+                    <div class="glass-panel" style="padding: 1.5rem; margin-top: 1rem;">
+                        <h3 style="margin-bottom: 0.75rem;">📐 Scaffolds</h3>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                            <div>
+                                <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; margin-bottom: 0.3rem;">Bemis–Murcko</div>
+                                <div id="scaffold-murcko" style="font-family: monospace; word-break: break-all; padding: 0.75rem; background: rgba(0,0,0,0.25); border-radius: 6px;">—</div>
+                            </div>
+                            <div>
+                                <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; margin-bottom: 0.3rem;">Generic Framework</div>
+                                <div id="scaffold-generic" style="font-family: monospace; word-break: break-all; padding: 0.75rem; background: rgba(0,0,0,0.25); border-radius: 6px;">—</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Ring metrics -->
+                    <div class="glass-panel" style="padding: 1.5rem; margin-top: 1rem;">
+                        <h3 style="margin-bottom: 0.75rem;">💍 Ring Topology</h3>
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1rem;">
+                            <div class="kpi-card" style="padding: 0.9rem;">
+                                <div class="kpi-label">Total Rings</div>
+                                <div id="ring-total" class="kpi-value" style="font-size: 1.6rem;">—</div>
+                            </div>
+                            <div class="kpi-card" style="padding: 0.9rem;">
+                                <div class="kpi-label">Aromatic</div>
+                                <div id="ring-arom" class="kpi-value" style="font-size: 1.6rem;">—</div>
+                            </div>
+                            <div class="kpi-card" style="padding: 0.9rem;">
+                                <div class="kpi-label">Aliphatic</div>
+                                <div id="ring-aliph" class="kpi-value" style="font-size: 1.6rem;">—</div>
+                            </div>
+                            <div class="kpi-card" style="padding: 0.9rem;">
+                                <div class="kpi-label">Largest Ring</div>
+                                <div id="ring-largest" class="kpi-value" style="font-size: 1.6rem;">—</div>
+                            </div>
+                            <div class="kpi-card" style="padding: 0.9rem;">
+                                <div class="kpi-label">Spiro Atoms</div>
+                                <div id="ring-spiro" class="kpi-value" style="font-size: 1.6rem;">—</div>
+                            </div>
+                            <div class="kpi-card" style="padding: 0.9rem;">
+                                <div class="kpi-label">Bridgeheads</div>
+                                <div id="ring-bridge" class="kpi-value" style="font-size: 1.6rem;">—</div>
+                            </div>
+                            <div class="kpi-card" style="padding: 0.9rem;">
+                                <div class="kpi-label">Macrocycle</div>
+                                <div id="ring-macro" class="kpi-value" style="font-size: 1.6rem;">—</div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </section>
 

@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.8.0] - 2026-05-16
+
+### Added — 📄 Aggregated Markdown Report
+- New `POST /report` endpoint that bundles standardisation, drug-likeness filters (Lipinski / Veber / Ghose), descriptors, ADMET, scaffold + SAScore, and functional groups into a single Markdown document.
+- "📄 Download Report" button in the Scaffold tab — produces `report_<smiles>_<date>.md`.
+- Configurable sections via request body flags (`include_admet`, `include_scaffold`, `include_functional_groups`, `include_descriptors`).
+
+## [2.7.0] - 2026-05-16
+
+### Added — ⚗️ Functional Group Annotator
+- New module `src/molprop/features/functional_groups.py` with `detect_functional_groups()` and a curated catalog of **~40 SMARTS patterns** spanning carbonyl, amine, nitrogen, oxygen, sulfur, phosphorus, halogen, aromatic, heteroaromatic, cyclic, and aliphatic categories.
+- Returns per-group hit count + matching atom indices (suitable for substructure highlighting in 2D depictions).
+- New endpoint `POST /functional_groups`.
+- Integrated into the **Scaffold tab**: category chips with color coding, sortable per-group cards showing name, count, SMARTS pattern, and category-tinted accent.
+
 ## [2.6.0] - 2026-05-16
 
 ### Added — 🦴 Scaffold Analysis & Synthetic Accessibility

@@ -35,6 +35,7 @@ from molprop.features.admet import compute_admet
 from molprop.features.conformers import generate_3d_conformer, mol_to_pdb
 from molprop.features.descriptors import get_descriptor_names, smiles_to_descriptors
 from molprop.features.fingerprints import smiles_to_maccs, tanimoto_similarity
+from molprop.features.functional_groups import detect_functional_groups
 from molprop.features.graphs import smiles_to_graph
 from molprop.features.scaffolds import analyze_scaffold
 from molprop.models.explain import explain_graph, get_explainer
@@ -1235,6 +1236,166 @@ async def scaffold_batch(req: BatchPredictRequest):
         r = analyze_scaffold(smi)
         results.append(r.to_dict() if r else {"smiles": smi, "error": "Invalid SMILES"})
     return {"results": results, "count": len(results)}
+
+
+# ── Aggregated Markdown Report ────────────────────────────────────────────────
+
+
+class ReportRequest(BaseModel):
+    smiles: str = Field(..., max_length=MAX_SMILES_LEN)
+    include_admet: bool = True
+    include_scaffold: bool = True
+    include_functional_groups: bool = True
+    include_descriptors: bool = True
+
+
+def _md_table(rows: list[tuple[str, str]]) -> str:
+    out = ["| Property | Value |", "|---|---|"]
+    for k, v in rows:
+        out.append(f"| {k} | {v} |")
+    return "\n".join(out)
+
+
+@app.post("/report", tags=["Reports"])
+async def molecule_report(req: ReportRequest):
+    """
+    Generate a comprehensive Markdown report for a molecule.
+
+    Aggregates standardisation, drug-likeness filters, descriptors,
+    ADMET, scaffold analysis, and functional groups into a single
+    downloadable Markdown document.
+    """
+    from datetime import datetime
+
+    smi_in = req.smiles
+    std_smi = standardize_smiles(smi_in)
+    if not std_smi:
+        raise HTTPException(status_code=422, detail=f"Invalid SMILES: '{smi_in}'")
+
+    sections: list[str] = []
+    timestamp = datetime.utcnow().isoformat(timespec="seconds") + "Z"
+
+    sections.append(f"# Molecule Report\n\n**Generated:** {timestamp}  \n")
+    sections.append(f"**Input SMILES:** `{smi_in}`  \n**Canonical SMILES:** `{std_smi}`\n")
+
+    # --- Drug-likeness filters --------------------------------------------------
+    sections.append("## 💊 Drug-likeness filters\n")
+    try:
+        ro5 = passes_lipinski_ro5(std_smi)
+        veber = veber_filter(std_smi)
+        ghose = ghose_filter(std_smi)
+        sections.append(
+            _md_table(
+                [
+                    ("Lipinski Ro5", "✅ Pass" if ro5 else "❌ Fail"),
+                    ("Veber", "✅ Pass" if veber else "❌ Fail"),
+                    ("Ghose", "✅ Pass" if ghose else "❌ Fail"),
+                ]
+            )
+        )
+    except Exception as e:
+        sections.append(f"_Filter computation failed: {e}_")
+
+    # --- Descriptors ------------------------------------------------------------
+    if req.include_descriptors:
+        sections.append("\n## 📊 Molecular descriptors\n")
+        try:
+            desc = smiles_to_descriptors(std_smi)
+            names = get_descriptor_names()
+            if desc is not None:
+                rows = [
+                    (n, f"{v:.3f}" if isinstance(v, float) else str(v))
+                    for n, v in zip(names, desc, strict=False)
+                ]
+                sections.append(_md_table(rows))
+            else:
+                sections.append("_Descriptor computation returned None._")
+        except Exception as e:
+            sections.append(f"_Descriptor computation failed: {e}_")
+
+    # --- Scaffold ---------------------------------------------------------------
+    if req.include_scaffold:
+        sections.append("\n## 🦴 Scaffold & synthetic accessibility\n")
+        scaf = analyze_scaffold(std_smi)
+        if scaf:
+            sections.append(
+                _md_table(
+                    [
+                        ("Bemis–Murcko scaffold", f"`{scaf.murcko_smiles or '(none)'}`"),
+                        ("Generic framework", f"`{scaf.generic_murcko_smiles or '(none)'}`"),
+                        ("SAScore", f"{scaf.sa_score:.2f} / 10 ({scaf.sa_class})"),
+                        ("Total rings", str(scaf.num_rings)),
+                        ("Aromatic rings", str(scaf.num_aromatic_rings)),
+                        ("Aliphatic rings", str(scaf.num_aliphatic_rings)),
+                        ("Largest ring size", str(scaf.largest_ring_size)),
+                        ("Spiro atoms", str(scaf.num_spiro_atoms)),
+                        ("Bridgehead atoms", str(scaf.num_bridgehead_atoms)),
+                        ("Macrocycle", "Yes" if scaf.has_macrocycle else "No"),
+                    ]
+                )
+            )
+
+    # --- Functional groups ------------------------------------------------------
+    if req.include_functional_groups:
+        sections.append("\n## ⚗️ Functional groups\n")
+        fg = detect_functional_groups(std_smi)
+        if fg and fg.groups:
+            sections.append(f"**{fg.num_groups_found} groups detected**\n")
+            sections.append("| Group | Category | Count |")
+            sections.append("|---|---|---|")
+            for g in sorted(fg.groups, key=lambda x: (-x.count, x.name)):
+                sections.append(f"| {g.name} | {g.category} | {g.count} |")
+        else:
+            sections.append("_No common functional groups detected._")
+
+    # --- ADMET ------------------------------------------------------------------
+    if req.include_admet:
+        sections.append("\n## 🧪 ADMET\n")
+        admet = compute_admet(std_smi)
+        if admet:
+            d = admet.to_dict()
+            rows = []
+            for section_key in [
+                "absorption",
+                "distribution",
+                "metabolism",
+                "excretion",
+                "toxicity",
+            ]:
+                section_data = d.get(section_key, {})
+                for k, v in section_data.items():
+                    rows.append((f"{section_key}.{k}", str(v)))
+            rows.append(("Overall score", f"{d.get('overall_score', 'N/A')} / 100"))
+            if d.get("alerts"):
+                rows.append(("Alerts", "; ".join(d["alerts"])))
+            sections.append(_md_table(rows))
+        else:
+            sections.append("_ADMET computation failed._")
+
+    sections.append("\n---\n_Generated by molprop — Molecular Property Prediction System_")
+    md = "\n".join(sections)
+    return {"smiles": smi_in, "canonical_smiles": std_smi, "markdown": md}
+
+
+# ── Functional Group Detection ────────────────────────────────────────────────
+
+
+class FunctionalGroupRequest(BaseModel):
+    smiles: str = Field(..., max_length=MAX_SMILES_LEN)
+
+
+@app.post("/functional_groups", tags=["Cheminformatics"])
+async def functional_groups(req: FunctionalGroupRequest):
+    """
+    Detect functional groups in a molecule via SMARTS matching.
+
+    Returns each detected group with its name, category, count of occurrences,
+    and the matching atom indices (suitable for substructure highlighting).
+    """
+    result = detect_functional_groups(req.smiles)
+    if result is None:
+        raise HTTPException(status_code=422, detail=f"Invalid SMILES: '{req.smiles}'")
+    return result.to_dict()
 
 
 # ── Compound Library Endpoints ────────────────────────────────────────────────

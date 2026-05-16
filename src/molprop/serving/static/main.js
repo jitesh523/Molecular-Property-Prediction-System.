@@ -1926,6 +1926,61 @@ document.addEventListener("DOMContentLoaded", () => {
                 document.getElementById("ring-macro").textContent = data.has_macrocycle ? "Yes" : "No";
 
                 scaffoldResults.classList.remove("hidden");
+
+                // Also fetch functional groups
+                try {
+                    const fgResp = await fetch("/functional_groups", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ smiles })
+                    });
+                    const fg = await fgResp.json();
+                    const fgListEl = document.getElementById("fg-list");
+                    const fgEmpty = document.getElementById("fg-empty");
+                    const fgCats = document.getElementById("fg-categories");
+                    const fgSummary = document.getElementById("fg-summary");
+
+                    fgSummary.textContent = `${fg.num_groups_found} group${fg.num_groups_found === 1 ? "" : "s"} detected`;
+
+                    // Category chips
+                    const catColors = {
+                        Carbonyl: "#f59e0b", Amine: "#8b5cf6", Nitrogen: "#a78bfa",
+                        Oxygen: "#06b6d4", Sulfur: "#fbbf24", Phosphorus: "#fb923c",
+                        Halogen: "#10b981", Aromatic: "#ec4899", Heteroaromatic: "#f472b6",
+                        Aliphatic: "#94a3b8", Cyclic: "#6366f1"
+                    };
+                    fgCats.innerHTML = Object.entries(fg.categories || {})
+                        .sort((a, b) => b[1] - a[1])
+                        .map(([cat, n]) => {
+                            const c = catColors[cat] || "#64748b";
+                            return `<span style="padding:0.3rem 0.7rem;border-radius:14px;background:${c}20;color:${c};border:1px solid ${c};font-size:0.78rem;font-weight:500;">${cat}: ${n}</span>`;
+                        }).join("");
+
+                    // Group cards
+                    fgListEl.innerHTML = "";
+                    if (fg.groups.length === 0) {
+                        fgEmpty.classList.remove("hidden");
+                    } else {
+                        fgEmpty.classList.add("hidden");
+                        fg.groups
+                            .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name))
+                            .forEach(g => {
+                                const c = catColors[g.category] || "#64748b";
+                                const card = document.createElement("div");
+                                card.style.cssText = `padding:0.6rem 0.8rem;border-left:3px solid ${c};background:rgba(255,255,255,0.03);border-radius:6px;`;
+                                card.innerHTML = `
+                                    <div style="display:flex;justify-content:space-between;align-items:center;gap:0.5rem;">
+                                        <span style="font-weight:600;color:white;">${g.name}</span>
+                                        <span style="font-size:0.78rem;color:${c};font-weight:700;">×${g.count}</span>
+                                    </div>
+                                    <div style="font-family:monospace;font-size:0.7rem;color:var(--text-muted);margin-top:0.2rem;">${g.smarts}</div>
+                                `;
+                                fgListEl.appendChild(card);
+                            });
+                    }
+                } catch (fgErr) {
+                    console.warn("Functional group detection failed:", fgErr);
+                }
             } catch (err) {
                 alert(err.message);
             } finally {
@@ -1941,6 +1996,42 @@ document.addEventListener("DOMContentLoaded", () => {
             scaffoldSmilesIn.value = lastPredictedSmiles;
         }
     });
+
+    // ── Markdown Report Download ────────────────────────────────────────────
+    const reportBtn = document.getElementById("report-btn");
+    if (reportBtn) {
+        reportBtn.addEventListener("click", async () => {
+            const smiles = (scaffoldSmilesIn?.value || lastPredictedSmiles || "").trim();
+            if (!smiles) { alert("Enter a SMILES string"); return; }
+
+            reportBtn.disabled = true;
+            reportBtn.textContent = "⏳ Generating…";
+            try {
+                const resp = await fetch("/report", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ smiles })
+                });
+                const data = await resp.json();
+                if (!resp.ok) throw new Error(data.detail || "Report generation failed");
+
+                const blob = new Blob([data.markdown], { type: "text/markdown" });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                const stamp = new Date().toISOString().slice(0, 10);
+                const safe = smiles.replace(/[^a-zA-Z0-9]/g, "_").slice(0, 30);
+                a.href = url;
+                a.download = `report_${safe}_${stamp}.md`;
+                a.click();
+                URL.revokeObjectURL(url);
+            } catch (err) {
+                alert(err.message);
+            } finally {
+                reportBtn.disabled = false;
+                reportBtn.textContent = "📄 Download Report";
+            }
+        });
+    }
 
     // Enter key support
     smilesInput.addEventListener("keypress", (e) => { if (e.key === "Enter") predictBtn.click(); });

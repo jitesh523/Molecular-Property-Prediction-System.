@@ -852,6 +852,7 @@
                             <input type="text" id="scaffold-smiles" placeholder="e.g., CC(=O)Oc1ccccc1C(=O)O" style="width:100%;">
                         </div>
                         <button id="scaffold-btn" class="btn-primary" style="padding:0.6rem 1.5rem;">🦴 Analyze</button>
+                        <button id="report-btn" class="btn-secondary" style="padding:0.6rem 1.5rem;" title="Download a comprehensive Markdown report">📄 Download Report</button>
                     </div>
                 </div>
 
@@ -921,6 +922,17 @@
                                 <div id="ring-macro" class="kpi-value" style="font-size: 1.6rem;">—</div>
                             </div>
                         </div>
+                    </div>
+
+                    <!-- Functional groups -->
+                    <div class="glass-panel" style="padding: 1.5rem; margin-top: 1rem;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; margin-bottom: 0.75rem;">
+                            <h3 style="margin: 0;">⚗️ Functional Groups</h3>
+                            <span id="fg-summary" class="gen-stats"></span>
+                        </div>
+                        <div id="fg-categories" style="display: flex; flex-wrap: wrap; gap: 0.4rem; margin-bottom: 1rem;"></div>
+                        <div id="fg-list" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 0.6rem;"></div>
+                        <p id="fg-empty" class="hidden" style="color: var(--text-muted); text-align: center; padding: 1rem;">No common functional groups detected.</p>
                     </div>
                 </div>
             </section>

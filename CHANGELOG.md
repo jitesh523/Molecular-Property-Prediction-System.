@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.5.0] - 2026-05-16
+
+### Added — 📚 Compound Library (persistent storage)
+- New module `src/molprop/storage/library.py` — thread-safe SQLite-backed CRUD using stdlib `sqlite3` only (no new dependencies).
+- Schema: `compounds(id, smiles, name, project, tags, properties_json, notes, created_at, updated_at)`. Idempotent upsert on `(smiles, project)`.
+- 6 new REST endpoints under `/library`:
+  - `POST /library` — save / upsert compound
+  - `GET /library` — list with filters (project, tag, search, limit, offset)
+  - `GET /library/projects` — distinct projects + tags
+  - `GET /library/{id}` — fetch one
+  - `PATCH /library/{id}` — partial update
+  - `DELETE /library/{id}` — remove
+- New **📚 Library tab** in UI: save form (SMILES, name, project, tags, notes), live filter bar (search debounce 300ms, project & tag dropdowns), sortable table with per-row Predict / Delete actions.
+- "Save to Library" button auto-injected into the Predict result panel.
+- DB lives at `data/library.db` (gitignored).
+
 ## [2.4.0] - 2026-05-15
 
 ### Added — 5 major UI/API upgrades

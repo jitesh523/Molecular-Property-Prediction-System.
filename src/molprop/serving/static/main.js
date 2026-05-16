@@ -1667,6 +1667,208 @@ document.addEventListener("DOMContentLoaded", () => {
     // Refresh dashboard when its tab is opened
     document.querySelector('[data-tab="dashboard"]')?.addEventListener("click", refreshDashboard);
 
+    // ── Compound Library Tab ────────────────────────────────────────────────
+    const libSmiles = document.getElementById("lib-smiles");
+    const libName = document.getElementById("lib-name");
+    const libProject = document.getElementById("lib-project");
+    const libTags = document.getElementById("lib-tags");
+    const libNotes = document.getElementById("lib-notes");
+    const libSaveBtn = document.getElementById("lib-save-btn");
+    const libSearch = document.getElementById("lib-search");
+    const libFilterProject = document.getElementById("lib-filter-project");
+    const libFilterTag = document.getElementById("lib-filter-tag");
+    const libRefreshBtn = document.getElementById("lib-refresh-btn");
+    const libTbody = document.getElementById("lib-tbody");
+    const libEmpty = document.getElementById("lib-empty");
+
+    function libEscape(s) {
+        return String(s ?? "").replace(/[&<>"']/g, c => ({
+            "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+        }[c]));
+    }
+
+    async function libLoadFilters() {
+        try {
+            const resp = await fetch("/library/projects");
+            const data = await resp.json();
+            const curP = libFilterProject.value;
+            libFilterProject.innerHTML = '<option value="">All projects</option>' +
+                (data.projects || []).map(p => `<option value="${libEscape(p)}">${libEscape(p)}</option>`).join('');
+            libFilterProject.value = curP;
+            const curT = libFilterTag.value;
+            libFilterTag.innerHTML = '<option value="">All tags</option>' +
+                (data.tags || []).map(t => `<option value="${libEscape(t)}">${libEscape(t)}</option>`).join('');
+            libFilterTag.value = curT;
+        } catch (err) {
+            console.warn("Failed to load library filters:", err);
+        }
+    }
+
+    async function libRefresh() {
+        try {
+            const params = new URLSearchParams();
+            if (libFilterProject.value) params.set("project", libFilterProject.value);
+            if (libFilterTag.value) params.set("tag", libFilterTag.value);
+            if (libSearch.value.trim()) params.set("search", libSearch.value.trim());
+            params.set("limit", "200");
+            const resp = await fetch(`/library?${params.toString()}`);
+            const data = await resp.json();
+            const compounds = data.compounds || [];
+
+            libTbody.innerHTML = "";
+            if (compounds.length === 0) {
+                libEmpty.classList.remove("hidden");
+                return;
+            }
+            libEmpty.classList.add("hidden");
+
+            compounds.forEach(c => {
+                const tagsHtml = (c.tags || [])
+                    .map(t => `<span class="history-prop-chip">${libEscape(t)}</span>`)
+                    .join(' ');
+                const updated = c.updated_at ? new Date(c.updated_at).toLocaleString() : "";
+                const tr = document.createElement("tr");
+                tr.innerHTML = `
+                    <td>${c.id}</td>
+                    <td style="font-family:monospace;font-size:0.78rem;max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${libEscape(c.smiles)}</td>
+                    <td>${libEscape(c.name || "—")}</td>
+                    <td>${libEscape(c.project)}</td>
+                    <td>${tagsHtml || '<span style="color:var(--text-muted);">—</span>'}</td>
+                    <td style="font-size:0.75rem;color:var(--text-muted);">${updated}</td>
+                    <td style="white-space:nowrap;">
+                        <button class="btn-secondary" style="padding:0.3rem 0.6rem;font-size:0.75rem;"
+                                onclick="window.libLoadInto('${libEscape(c.smiles)}')">Predict</button>
+                        <button class="btn-secondary" style="padding:0.3rem 0.6rem;font-size:0.75rem;"
+                                onclick="window.libDelete(${c.id})" style="color:var(--danger);">🗑</button>
+                    </td>
+                `;
+                libTbody.appendChild(tr);
+            });
+        } catch (err) {
+            alert("Failed to load library: " + err.message);
+        }
+    }
+
+    if (libSaveBtn) {
+        libSaveBtn.addEventListener("click", async () => {
+            const smiles = libSmiles.value.trim();
+            if (!smiles) { alert("Enter a SMILES string"); return; }
+
+            const tags = libTags.value
+                .split(",").map(t => t.trim()).filter(t => t);
+            try {
+                const resp = await fetch("/library", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        smiles,
+                        name: libName.value.trim() || null,
+                        project: libProject.value.trim() || "default",
+                        tags,
+                        notes: libNotes.value.trim() || null,
+                        properties: {}
+                    })
+                });
+                const data = await resp.json();
+                if (!resp.ok) throw new Error(data.detail || "Save failed");
+
+                // Clear form (keep project)
+                libSmiles.value = "";
+                libName.value = "";
+                libTags.value = "";
+                libNotes.value = "";
+                await libLoadFilters();
+                await libRefresh();
+            } catch (err) {
+                alert(err.message);
+            }
+        });
+    }
+
+    window.libLoadInto = (smiles) => {
+        smilesInput.value = smiles;
+        document.querySelector('[data-tab="predict"]').click();
+        predictBtn.click();
+    };
+
+    window.libDelete = async (id) => {
+        if (!confirm(`Delete compound #${id}?`)) return;
+        try {
+            const resp = await fetch(`/library/${id}`, { method: "DELETE" });
+            if (!resp.ok) throw new Error("Delete failed");
+            await libRefresh();
+        } catch (err) {
+            alert(err.message);
+        }
+    };
+
+    if (libRefreshBtn) libRefreshBtn.addEventListener("click", libRefresh);
+    if (libFilterProject) libFilterProject.addEventListener("change", libRefresh);
+    if (libFilterTag) libFilterTag.addEventListener("change", libRefresh);
+    if (libSearch) {
+        let searchTimer;
+        libSearch.addEventListener("input", () => {
+            clearTimeout(searchTimer);
+            searchTimer = setTimeout(libRefresh, 300);
+        });
+    }
+
+    // Auto-load library tab on first click
+    document.querySelector('[data-tab="library"]')?.addEventListener("click", async () => {
+        if (lastPredictedSmiles && libSmiles && !libSmiles.value) {
+            libSmiles.value = lastPredictedSmiles;
+        }
+        await libLoadFilters();
+        await libRefresh();
+    });
+
+    // Add "Save to Library" buttons to the predict result panel
+    const predictSaveBtnHook = () => {
+        // Inject save-to-library button if a result is shown
+        const result = document.getElementById("result");
+        if (!result || result.classList.contains("hidden")) return;
+        if (document.getElementById("predict-save-lib-btn")) return;
+        const btn = document.createElement("button");
+        btn.id = "predict-save-lib-btn";
+        btn.className = "btn-secondary";
+        btn.textContent = "📚 Save to Library";
+        btn.style.cssText = "padding:0.4rem 0.9rem;font-size:0.85rem;margin-left:0.5rem;";
+        btn.addEventListener("click", async () => {
+            if (!lastPredictedSmiles) return;
+            const tag = prompt("Optional tags (comma-separated):", "predicted") || "";
+            try {
+                const resp = await fetch("/library", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        smiles: lastPredictedSmiles,
+                        project: "default",
+                        tags: tag.split(",").map(t => t.trim()).filter(t => t),
+                        properties: {}
+                    })
+                });
+                if (!resp.ok) {
+                    const d = await resp.json();
+                    throw new Error(d.detail || "Save failed");
+                }
+                btn.textContent = "✅ Saved!";
+                setTimeout(() => { btn.textContent = "📚 Save to Library"; }, 1500);
+            } catch (err) {
+                alert(err.message);
+            }
+        });
+        // Find a place to put it
+        const predictedSmiles = document.getElementById("predicted-smiles");
+        if (predictedSmiles && predictedSmiles.parentElement) {
+            predictedSmiles.parentElement.appendChild(btn);
+        }
+    };
+
+    // Hook into prediction completion
+    const origObserver = new MutationObserver(predictSaveBtnHook);
+    const resultEl = document.getElementById("result");
+    if (resultEl) origObserver.observe(resultEl, { attributes: true, attributeFilter: ["class"] });
+
     // Enter key support
     smilesInput.addEventListener("keypress", (e) => { if (e.key === "Enter") predictBtn.click(); });
 });

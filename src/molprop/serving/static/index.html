@@ -55,6 +55,9 @@
             <button class="tab-btn" data-tab="dashboard">
                 <span class="tab-icon">📊</span> Dashboard
             </button>
+            <button class="tab-btn" data-tab="library">
+                <span class="tab-icon">📚</span> Library
+            </button>
         </nav>
 
         <main>
@@ -759,6 +762,76 @@
                 <div class="glass-panel slide-up" style="padding: 1.5rem; margin-top: 1rem;">
                     <h3 style="margin-bottom: 1rem;">📅 Prediction Timeline</h3>
                     <canvas id="dashboard-timeline" width="900" height="250" style="width:100%;background:rgba(0,0,0,0.2);border-radius:8px;"></canvas>
+                </div>
+            </section>
+
+            <!-- ══════════════════════════════════════════════════════════════
+                 TAB 11 – COMPOUND LIBRARY
+            ══════════════════════════════════════════════════════════════ -->
+            <section id="tab-library" class="tab-panel hidden">
+                <div class="input-section glass-panel fade-in slide-up">
+                    <h2>📚 Compound Library</h2>
+                    <p class="section-desc">Persistent storage for your molecules. Organize by project, tag, and add notes. Backed by SQLite — survives server restarts.</p>
+
+                    <!-- Save form -->
+                    <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0.75rem; margin-top: 1rem;">
+                        <div>
+                            <label for="lib-smiles">SMILES</label>
+                            <input type="text" id="lib-smiles" placeholder="CC(=O)Oc1ccccc1C(=O)O" style="width:100%;">
+                        </div>
+                        <div>
+                            <label for="lib-name">Name (optional)</label>
+                            <input type="text" id="lib-name" placeholder="Aspirin" style="width:100%;">
+                        </div>
+                        <div>
+                            <label for="lib-project">Project</label>
+                            <input type="text" id="lib-project" placeholder="default" value="default" style="width:100%;">
+                        </div>
+                        <div>
+                            <label for="lib-tags">Tags (comma-separated)</label>
+                            <input type="text" id="lib-tags" placeholder="lead, hit, scaffold-1" style="width:100%;">
+                        </div>
+                        <div style="grid-column: span 2;">
+                            <label for="lib-notes">Notes</label>
+                            <input type="text" id="lib-notes" placeholder="Optional notes…" style="width:100%;">
+                        </div>
+                    </div>
+                    <div style="display: flex; gap: 0.5rem; margin-top: 1rem; justify-content: flex-end;">
+                        <button id="lib-save-btn" class="btn-primary" style="padding:0.6rem 1.5rem;">💾 Save Compound</button>
+                    </div>
+                </div>
+
+                <!-- Filter bar -->
+                <div class="glass-panel slide-up" style="padding: 1rem; margin-top: 1rem; display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap;">
+                    <input type="text" id="lib-search" placeholder="🔎 Search SMILES, name, notes…" style="flex:1;min-width:200px;">
+                    <select id="lib-filter-project" style="padding: 0.6rem 1rem; min-width: 150px;">
+                        <option value="">All projects</option>
+                    </select>
+                    <select id="lib-filter-tag" style="padding: 0.6rem 1rem; min-width: 140px;">
+                        <option value="">All tags</option>
+                    </select>
+                    <button id="lib-refresh-btn" class="btn-secondary" style="padding:0.6rem 1rem;">↻ Refresh</button>
+                </div>
+
+                <!-- Compound table -->
+                <div style="overflow-x: auto; margin-top: 1rem;">
+                    <table id="lib-table" class="compare-table">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>SMILES</th>
+                                <th>Name</th>
+                                <th>Project</th>
+                                <th>Tags</th>
+                                <th>Updated</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="lib-tbody"></tbody>
+                    </table>
+                    <p id="lib-empty" class="hidden" style="text-align:center;padding:2rem;color:var(--text-muted);">
+                        No compounds yet — save one above to get started.
+                    </p>
                 </div>
             </section>
 

@@ -43,6 +43,7 @@ from molprop.models.vae import SMILESVAE
 from molprop.models.visualize_explanations import get_explanation_image
 from molprop.serving.load_model import load_gnn_model
 from molprop.serving.vector_db import vector_store
+from molprop.storage.library import library
 
 log = logging.getLogger(__name__)
 
@@ -1204,6 +1205,96 @@ async def fingerprint_similarity_search(req: SimilaritySearchRequest):
             for i, r in enumerate(top_results)
         ],
     }
+
+
+# ── Compound Library Endpoints ────────────────────────────────────────────────
+
+
+class LibrarySaveRequest(BaseModel):
+    smiles: str = Field(..., max_length=MAX_SMILES_LEN)
+    name: Optional[str] = Field(None, max_length=200)
+    project: str = Field("default", max_length=80)
+    tags: list[str] = Field(default_factory=list)
+    properties: dict = Field(default_factory=dict)
+    notes: Optional[str] = Field(None, max_length=2000)
+
+
+class LibraryUpdateRequest(BaseModel):
+    name: Optional[str] = Field(None, max_length=200)
+    tags: Optional[list[str]] = None
+    notes: Optional[str] = Field(None, max_length=2000)
+    properties: Optional[dict] = None
+
+
+@app.post("/library", tags=["Library"])
+async def library_save(req: LibrarySaveRequest):
+    """Save a compound to the library (idempotent on (smiles, project))."""
+    std_smi = standardize_smiles(req.smiles)
+    if not std_smi:
+        raise HTTPException(status_code=422, detail=f"Invalid SMILES: '{req.smiles}'")
+    return library.add(
+        smiles=std_smi,
+        name=req.name,
+        project=req.project,
+        tags=req.tags,
+        properties=req.properties,
+        notes=req.notes,
+    )
+
+
+@app.get("/library", tags=["Library"])
+async def library_list(
+    project: Optional[str] = None,
+    tag: Optional[str] = None,
+    search: Optional[str] = None,
+    limit: int = 100,
+    offset: int = 0,
+):
+    """List compounds in the library, with optional filters."""
+    return {
+        "compounds": library.list(
+            project=project, tag=tag, search=search, limit=limit, offset=offset
+        ),
+        "total": library.count(project=project),
+    }
+
+
+@app.get("/library/projects", tags=["Library"])
+async def library_projects():
+    """Return all known projects + tags."""
+    return {"projects": library.projects(), "tags": library.all_tags()}
+
+
+@app.get("/library/{compound_id}", tags=["Library"])
+async def library_get(compound_id: int):
+    """Get a single compound by ID."""
+    result = library.get(compound_id)
+    if not result:
+        raise HTTPException(status_code=404, detail=f"Compound {compound_id} not found")
+    return result
+
+
+@app.patch("/library/{compound_id}", tags=["Library"])
+async def library_update(compound_id: int, req: LibraryUpdateRequest):
+    """Update a compound's metadata."""
+    result = library.update(
+        compound_id,
+        name=req.name,
+        tags=req.tags,
+        notes=req.notes,
+        properties=req.properties,
+    )
+    if not result:
+        raise HTTPException(status_code=404, detail=f"Compound {compound_id} not found")
+    return result
+
+
+@app.delete("/library/{compound_id}", tags=["Library"])
+async def library_delete(compound_id: int):
+    """Delete a compound by ID."""
+    if not library.delete(compound_id):
+        raise HTTPException(status_code=404, detail=f"Compound {compound_id} not found")
+    return {"status": "deleted", "id": compound_id}
 
 
 # ── Conformer Endpoint ────────────────────────────────────────────────────────

@@ -5,6 +5,28 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.12.0] - 2026-05-17
+
+### Added — 4 new cheminformatics endpoints (one batch release)
+
+- **🧬 v2.9.0 — Isomer Enumeration** (`POST /isomers`)
+  - New module `src/molprop/features/isomers.py`.
+  - Enumerates **tautomers** (RDKit `TautomerEnumerator`) and **stereoisomers** of unassigned centres (RDKit `EnumerateStereoisomers`).
+  - Returns the canonical tautomer + every enumerated isomer, capped configurably (defaults: 25 tautomers, 16 stereoisomers).
+
+- **🔎 v2.10.0 — Substructure SMARTS Search** (`POST /substructure`)
+  - New module `src/molprop/features/substructure.py`.
+  - Accepts SMARTS or SMILES query patterns; falls back gracefully between the two.
+  - Searches an explicit candidate list **or the persistent compound library** (optionally scoped to a project) — bridges Library + cheminformatics.
+  - Returns matching SMILES with hit counts and atom-index lists for substructure highlighting.
+
+- **🔬 v2.11.0 — Compound Comparison** (`POST /compare`)
+  - Side-by-side analysis of two molecules: canonical SMILES, MACCS Tanimoto similarity, descriptor diffs (per-descriptor delta), Lipinski / Veber / Ghose flags, SAScore, Bemis–Murcko scaffold equality.
+
+- **🧹 v2.12.0 — Standardization Report** (`POST /standardize`)
+  - Detailed standardisation breakdown: salt stripping, neutralisation (Uncharger), largest-fragment selection, and the final canonical form.
+  - Reports whether each step changed the input — useful for QA on user-submitted compounds before storing them in the library.
+
 ## [2.8.0] - 2026-05-16
 
 ### Added — 📄 Aggregated Markdown Report

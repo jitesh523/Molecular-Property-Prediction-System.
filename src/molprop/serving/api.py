@@ -37,7 +37,9 @@ from molprop.features.descriptors import get_descriptor_names, smiles_to_descrip
 from molprop.features.fingerprints import smiles_to_maccs, tanimoto_similarity
 from molprop.features.functional_groups import detect_functional_groups
 from molprop.features.graphs import smiles_to_graph
+from molprop.features.isomers import enumerate_isomers
 from molprop.features.scaffolds import analyze_scaffold
+from molprop.features.substructure import substructure_search
 from molprop.models.explain import explain_graph, get_explainer
 from molprop.models.optimization import LatentOptimizer
 from molprop.models.pareto import ParetoOptimizer
@@ -1236,6 +1238,220 @@ async def scaffold_batch(req: BatchPredictRequest):
         r = analyze_scaffold(smi)
         results.append(r.to_dict() if r else {"smiles": smi, "error": "Invalid SMILES"})
     return {"results": results, "count": len(results)}
+
+
+# ── Isomer Enumeration ────────────────────────────────────────────────────────
+
+
+class IsomerRequest(BaseModel):
+    smiles: str = Field(..., max_length=MAX_SMILES_LEN)
+    max_tautomers: int = Field(25, ge=1, le=100)
+    max_stereoisomers: int = Field(16, ge=1, le=64)
+
+
+@app.post("/isomers", tags=["Cheminformatics"])
+async def isomer_enumeration(req: IsomerRequest):
+    """
+    Enumerate tautomers and stereoisomers for a molecule.
+
+    Returns the canonical tautomer, every enumerated tautomer (capped at
+    `max_tautomers`), and every stereoisomer of currently-unassigned
+    centres (capped at `max_stereoisomers`).
+    """
+    result = enumerate_isomers(
+        req.smiles,
+        max_tautomers=req.max_tautomers,
+        max_stereoisomers=req.max_stereoisomers,
+    )
+    if result is None:
+        raise HTTPException(status_code=422, detail=f"Invalid SMILES: '{req.smiles}'")
+    return result.to_dict()
+
+
+# ── Substructure Search ───────────────────────────────────────────────────────
+
+
+class SubstructureRequest(BaseModel):
+    query: str = Field(..., max_length=500, description="SMARTS or SMILES query pattern")
+    candidates: Optional[list[str]] = Field(
+        None,
+        description="Optional list of SMILES to search; if omitted, the compound library is searched.",
+    )
+    project: Optional[str] = Field(None, description="Restrict library search to a project")
+    limit: int = Field(100, ge=1, le=500)
+
+
+@app.post("/substructure", tags=["Cheminformatics"])
+async def substructure(req: SubstructureRequest):
+    """
+    Find every candidate that contains the query SMARTS / SMILES substructure.
+
+    If ``candidates`` is provided, those SMILES are searched. Otherwise the
+    persistent compound library is searched (optionally scoped to a project).
+    """
+    if req.candidates:
+        cands = [{"smiles": s} for s in req.candidates]
+        source = "user_list"
+    else:
+        compounds = library.list(project=req.project, limit=10000)
+        cands = [{"smiles": c["smiles"], "name": c.get("name")} for c in compounds]
+        source = f"library:{req.project or 'all'}"
+
+    matches, stats = substructure_search(req.query, cands, limit=req.limit)
+    if "error" in stats:
+        raise HTTPException(status_code=422, detail=stats["error"])
+
+    return {
+        "query": req.query,
+        "source": source,
+        "stats": stats,
+        "matches": [m.__dict__ for m in matches],
+    }
+
+
+# ── Compound Comparison ───────────────────────────────────────────────────────
+
+
+class CompareRequest(BaseModel):
+    smiles_a: str = Field(..., max_length=MAX_SMILES_LEN)
+    smiles_b: str = Field(..., max_length=MAX_SMILES_LEN)
+
+
+@app.post("/compare", tags=["Cheminformatics"])
+async def compare_compounds(req: CompareRequest):
+    """
+    Side-by-side comparison of two molecules.
+
+    Returns canonical SMILES, MACCS Tanimoto similarity, descriptor diffs,
+    drug-likeness filters, and SAScore for each.
+    """
+    a_std = standardize_smiles(req.smiles_a)
+    b_std = standardize_smiles(req.smiles_b)
+    if not a_std:
+        raise HTTPException(status_code=422, detail=f"Invalid SMILES (A): '{req.smiles_a}'")
+    if not b_std:
+        raise HTTPException(status_code=422, detail=f"Invalid SMILES (B): '{req.smiles_b}'")
+
+    desc_names = get_descriptor_names()
+    desc_a = smiles_to_descriptors(a_std)
+    desc_b = smiles_to_descriptors(b_std)
+
+    descriptor_diff: list[dict] = []
+    if desc_a is not None and desc_b is not None:
+        for name, va, vb in zip(desc_names, desc_a, desc_b, strict=False):
+            try:
+                delta = float(vb) - float(va)
+            except (TypeError, ValueError):
+                delta = None
+            descriptor_diff.append(
+                {
+                    "name": name,
+                    "a": float(va) if va is not None else None,
+                    "b": float(vb) if vb is not None else None,
+                    "delta": delta,
+                }
+            )
+
+    # MACCS Tanimoto
+    fp_a = smiles_to_maccs(a_std)
+    fp_b = smiles_to_maccs(b_std)
+    similarity = (
+        round(tanimoto_similarity(fp_a, fp_b), 4) if fp_a is not None and fp_b is not None else None
+    )
+
+    scaf_a = analyze_scaffold(a_std)
+    scaf_b = analyze_scaffold(b_std)
+
+    return {
+        "a": {
+            "input": req.smiles_a,
+            "canonical": a_std,
+            "lipinski": passes_lipinski_ro5(a_std),
+            "veber": veber_filter(a_std),
+            "ghose": ghose_filter(a_std),
+            "sa_score": scaf_a.sa_score if scaf_a else None,
+            "murcko": scaf_a.murcko_smiles if scaf_a else None,
+        },
+        "b": {
+            "input": req.smiles_b,
+            "canonical": b_std,
+            "lipinski": passes_lipinski_ro5(b_std),
+            "veber": veber_filter(b_std),
+            "ghose": ghose_filter(b_std),
+            "sa_score": scaf_b.sa_score if scaf_b else None,
+            "murcko": scaf_b.murcko_smiles if scaf_b else None,
+        },
+        "tanimoto_maccs": similarity,
+        "same_scaffold": (
+            scaf_a is not None
+            and scaf_b is not None
+            and scaf_a.murcko_smiles == scaf_b.murcko_smiles
+            and scaf_a.murcko_smiles is not None
+        ),
+        "descriptor_diff": descriptor_diff,
+    }
+
+
+# ── Standardization Endpoint (with detailed report) ──────────────────────────
+
+
+class StandardizeRequest(BaseModel):
+    smiles: str = Field(..., max_length=MAX_SMILES_LEN)
+
+
+@app.post("/standardize", tags=["Cheminformatics"])
+async def standardize_endpoint(req: StandardizeRequest):
+    """
+    Run full standardisation on a SMILES and report what changed.
+
+    Reports the canonical form, whether salts were stripped, neutralisation,
+    and the largest fragment if a multi-component input was supplied.
+    """
+    from rdkit import Chem
+    from rdkit.Chem import MolStandardize, SaltRemover
+
+    mol = Chem.MolFromSmiles(req.smiles)
+    if mol is None:
+        raise HTTPException(status_code=422, detail=f"Invalid SMILES: '{req.smiles}'")
+
+    raw_canonical = Chem.MolToSmiles(mol)
+    n_fragments_in = len(Chem.GetMolFrags(mol))
+
+    # Salt strip
+    remover = SaltRemover.SaltRemover()
+    stripped = remover.StripMol(mol, dontRemoveEverything=True)
+    salt_stripped = Chem.MolToSmiles(stripped) if stripped is not None else None
+    salts_removed = (stripped is not None) and (Chem.MolToSmiles(stripped) != raw_canonical)
+
+    # Neutralise
+    try:
+        uncharger = MolStandardize.rdMolStandardize.Uncharger()
+        neutralised_mol = uncharger.uncharge(stripped if stripped else mol)
+        neutralised = Chem.MolToSmiles(neutralised_mol) if neutralised_mol else None
+    except Exception:
+        neutralised = None
+
+    # Largest fragment
+    try:
+        chooser = MolStandardize.rdMolStandardize.LargestFragmentChooser()
+        biggest_mol = chooser.choose(mol)
+        biggest = Chem.MolToSmiles(biggest_mol) if biggest_mol else None
+    except Exception:
+        biggest = None
+
+    final = standardize_smiles(req.smiles)
+
+    return {
+        "input": req.smiles,
+        "raw_canonical": raw_canonical,
+        "n_input_fragments": n_fragments_in,
+        "salt_stripped": salt_stripped,
+        "salts_removed": salts_removed,
+        "neutralised": neutralised,
+        "largest_fragment": biggest,
+        "final_standardized": final,
+        "changed": final != req.smiles,
+    }
 
 
 # ── Aggregated Markdown Report ────────────────────────────────────────────────

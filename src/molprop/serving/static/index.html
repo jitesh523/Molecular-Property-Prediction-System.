@@ -61,6 +61,12 @@
             <button class="tab-btn" data-tab="scaffold">
                 <span class="tab-icon">🦴</span> Scaffold
             </button>
+            <button class="tab-btn" data-tab="compare">
+                <span class="tab-icon">🔬</span> Compare
+            </button>
+            <button class="tab-btn" data-tab="isomers">
+                <span class="tab-icon">🧬</span> Isomers
+            </button>
         </nav>
 
         <main>
@@ -933,6 +939,115 @@
                         <div id="fg-categories" style="display: flex; flex-wrap: wrap; gap: 0.4rem; margin-bottom: 1rem;"></div>
                         <div id="fg-list" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 0.6rem;"></div>
                         <p id="fg-empty" class="hidden" style="color: var(--text-muted); text-align: center; padding: 1rem;">No common functional groups detected.</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ══════════════════════════════════════════════════════════════
+                 TAB 13 – COMPARE
+            ══════════════════════════════════════════════════════════════ -->
+            <section id="tab-compare" class="tab-panel hidden">
+                <div class="input-section glass-panel fade-in slide-up">
+                    <h2>🔬 Compare Two Molecules</h2>
+                    <p class="section-desc">Side-by-side analysis: Tanimoto similarity, descriptor deltas, drug-likeness, scaffold equality, SAScore.</p>
+
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1rem;">
+                        <div>
+                            <label for="cmp-a">Molecule A (SMILES)</label>
+                            <input type="text" id="cmp-a" placeholder="CC(=O)Oc1ccccc1C(=O)O" style="width:100%;">
+                        </div>
+                        <div>
+                            <label for="cmp-b">Molecule B (SMILES)</label>
+                            <input type="text" id="cmp-b" placeholder="CC(=O)Nc1ccc(O)cc1" style="width:100%;">
+                        </div>
+                    </div>
+                    <div style="margin-top: 1rem; text-align: right;">
+                        <button id="cmp-btn" class="btn-primary" style="padding:0.6rem 1.5rem;">🔬 Compare</button>
+                    </div>
+                </div>
+
+                <div id="cmp-results" class="hidden slide-up" style="margin-top: 1rem;">
+                    <!-- Similarity header -->
+                    <div class="glass-panel" style="padding: 1.5rem; text-align: center;">
+                        <div style="font-size: 0.85rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.1em;">MACCS Tanimoto Similarity</div>
+                        <div id="cmp-similarity" style="font-size: 3.5rem; font-weight: 800; margin: 0.5rem 0;">—</div>
+                        <div id="cmp-scaffold-eq" style="font-size: 0.9rem; color: var(--text-muted);"></div>
+                    </div>
+
+                    <!-- Side-by-side panels -->
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1rem;">
+                        <div class="glass-panel" style="padding: 1.25rem;">
+                            <h3 style="margin-bottom: 0.75rem;">Molecule A</h3>
+                            <div id="cmp-a-info"></div>
+                        </div>
+                        <div class="glass-panel" style="padding: 1.25rem;">
+                            <h3 style="margin-bottom: 0.75rem;">Molecule B</h3>
+                            <div id="cmp-b-info"></div>
+                        </div>
+                    </div>
+
+                    <!-- Descriptor diff table -->
+                    <div class="glass-panel" style="padding: 1.25rem; margin-top: 1rem;">
+                        <h3 style="margin-bottom: 0.75rem;">📊 Descriptor Differences</h3>
+                        <div style="overflow-x: auto;">
+                            <table class="compare-table">
+                                <thead>
+                                    <tr><th>Descriptor</th><th>A</th><th>B</th><th>Δ (B − A)</th></tr>
+                                </thead>
+                                <tbody id="cmp-diff-tbody"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ══════════════════════════════════════════════════════════════
+                 TAB 14 – ISOMERS
+            ══════════════════════════════════════════════════════════════ -->
+            <section id="tab-isomers" class="tab-panel hidden">
+                <div class="input-section glass-panel fade-in slide-up">
+                    <h2>🧬 Tautomer &amp; Stereoisomer Enumeration</h2>
+                    <p class="section-desc">Enumerate prototropic tautomers and stereoisomers of unassigned stereocentres. Identifies the canonical (lowest-energy) tautomer.</p>
+
+                    <div style="display: grid; grid-template-columns: 2fr 1fr 1fr auto; gap: 0.75rem; align-items: end; margin-top: 1rem;">
+                        <div>
+                            <label for="iso-smiles">SMILES</label>
+                            <input type="text" id="iso-smiles" placeholder="CC(=O)NC1=CC=C(O)C=C1" style="width:100%;">
+                        </div>
+                        <div>
+                            <label for="iso-max-taut">Max tautomers</label>
+                            <input type="number" id="iso-max-taut" value="25" min="1" max="100" style="width:100%;">
+                        </div>
+                        <div>
+                            <label for="iso-max-stereo">Max stereoisomers</label>
+                            <input type="number" id="iso-max-stereo" value="16" min="1" max="64" style="width:100%;">
+                        </div>
+                        <button id="iso-btn" class="btn-primary" style="padding:0.6rem 1.5rem;">🧬 Enumerate</button>
+                    </div>
+                </div>
+
+                <div id="iso-results" class="hidden slide-up" style="margin-top: 1rem;">
+                    <div class="glass-panel" style="padding: 1.25rem; text-align: center;">
+                        <div style="font-size: 0.8rem; color: var(--text-muted); text-transform: uppercase;">Canonical Tautomer</div>
+                        <div id="iso-canonical" style="font-family: monospace; font-size: 1.1rem; margin-top: 0.4rem; word-break: break-all; color: var(--accent-color);"></div>
+                    </div>
+
+                    <!-- Tautomers list -->
+                    <div class="glass-panel" style="padding: 1.25rem; margin-top: 1rem;">
+                        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.5rem;margin-bottom:0.75rem;">
+                            <h3 style="margin:0;">⚖️ Tautomers</h3>
+                            <span id="iso-taut-count" class="gen-stats"></span>
+                        </div>
+                        <div id="iso-taut-list" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 0.5rem;"></div>
+                    </div>
+
+                    <!-- Stereoisomers list -->
+                    <div class="glass-panel" style="padding: 1.25rem; margin-top: 1rem;">
+                        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.5rem;margin-bottom:0.75rem;">
+                            <h3 style="margin:0;">↔️ Stereoisomers</h3>
+                            <span id="iso-stereo-count" class="gen-stats"></span>
+                        </div>
+                        <div id="iso-stereo-list" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 0.5rem;"></div>
                     </div>
                 </div>
             </section>

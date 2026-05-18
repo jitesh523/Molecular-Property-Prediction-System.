@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.16.0] - 2026-05-18
+
+### Added — UI completion, test coverage, and a Python SDK
+
+- **🔬 v2.13.0 — Compare tab UI** — wires the `/compare` endpoint to a fully interactive panel: large MACCS Tanimoto headline with color coding (green ≥ 0.7 / yellow ≥ 0.4 / red < 0.4), scaffold-equality banner, side-by-side molecule cards (canonical SMILES, Lipinski / Veber / Ghose tick marks, SAScore, Murcko), and a full descriptor-delta table with ▲/▼ arrows.
+- **🧬 v2.14.0 — Isomers tab UI** — wires the `/isomers` endpoint: configurable max-tautomer / max-stereoisomer caps, canonical-tautomer hero panel, separate accent-colored card grids for tautomers (purple) and stereoisomers (cyan) with "CANONICAL" badges and copy-to-clipboard.
+- **🧪 v2.15.0 — Test suite** — two new pytest modules:
+  - `tests/test_storage.py` — 9 tests covering `CompoundLibrary` CRUD, upsert idempotency, project/tag filters, persistence across reopens.
+  - `tests/test_cheminformatics_features.py` — 18 tests covering scaffolds (aspirin/quinine/macrocycle), functional groups (aspirin / acetaminophen / atom-index validity), isomers (canonical-flag uniqueness, limit enforcement), and substructure search (SMARTS + SMILES queries, invalid-input handling, limit respect).
+- **🐍 v2.16.0 — Python SDK** (`src/molprop/client.py`) — `MolpropClient` with one method per endpoint:
+  - `health`, `version`, `predict`, `predict_batch`, `generate`, `generate_smart`, `admet`, `admet_batch`, `scaffold`, `scaffold_batch`, `functional_groups`, `isomers`, `substructure`, `compare`, `standardize`, `conformer`, `search_similar`, `report`, `library_save`, `library_list`, `library_get`, `library_update`, `library_delete`, `library_projects`.
+  - Uniform error path via `MolpropAPIError` (carries status code + detail + URL).
+  - Reusable `requests.Session`, configurable base URL & timeout.
+
 ## [2.12.0] - 2026-05-17
 
 ### Added — 4 new cheminformatics endpoints (one batch release)

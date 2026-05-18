@@ -2033,6 +2033,174 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 
+    // ── Compare Tab ─────────────────────────────────────────────────────────
+    const cmpBtn = document.getElementById("cmp-btn");
+    const cmpA = document.getElementById("cmp-a");
+    const cmpB = document.getElementById("cmp-b");
+    const cmpResults = document.getElementById("cmp-results");
+
+    function renderMolPanel(mol) {
+        const tickX = (v) => v
+            ? `<span style="color:#10b981">✅</span>`
+            : `<span style="color:#f87171">❌</span>`;
+        return `
+            <div style="font-family:monospace;font-size:0.8rem;word-break:break-all;color:var(--text-muted);margin-bottom:0.6rem;">${mol.canonical}</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.4rem;font-size:0.85rem;">
+                <div>Lipinski Ro5</div><div>${tickX(mol.lipinski)}</div>
+                <div>Veber</div><div>${tickX(mol.veber)}</div>
+                <div>Ghose</div><div>${tickX(mol.ghose)}</div>
+                <div>SAScore</div><div><strong>${mol.sa_score !== null ? mol.sa_score.toFixed(2) : '—'}</strong> / 10</div>
+                <div>Murcko</div><div style="font-family:monospace;font-size:0.72rem;color:var(--text-muted);">${mol.murcko || '(none)'}</div>
+            </div>`;
+    }
+
+    if (cmpBtn) {
+        cmpBtn.addEventListener("click", async () => {
+            const a = cmpA.value.trim();
+            const b = cmpB.value.trim();
+            if (!a || !b) { alert("Enter both SMILES"); return; }
+
+            cmpBtn.disabled = true;
+            cmpBtn.textContent = "⏳ Comparing…";
+            cmpResults.classList.add("hidden");
+
+            try {
+                const resp = await fetch("/compare", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ smiles_a: a, smiles_b: b })
+                });
+                const data = await resp.json();
+                if (!resp.ok) throw new Error(data.detail || "Compare failed");
+
+                // Similarity headline
+                const sim = data.tanimoto_maccs;
+                const simEl = document.getElementById("cmp-similarity");
+                if (sim === null || sim === undefined) {
+                    simEl.textContent = "—";
+                    simEl.style.color = "var(--text-muted)";
+                } else {
+                    simEl.textContent = sim.toFixed(3);
+                    if (sim >= 0.7) simEl.style.color = "#10b981";
+                    else if (sim >= 0.4) simEl.style.color = "#fbbf24";
+                    else simEl.style.color = "#f87171";
+                }
+                document.getElementById("cmp-scaffold-eq").innerHTML =
+                    data.same_scaffold
+                        ? "🎯 <strong>Identical Bemis–Murcko scaffold</strong>"
+                        : "Different scaffolds";
+
+                document.getElementById("cmp-a-info").innerHTML = renderMolPanel(data.a);
+                document.getElementById("cmp-b-info").innerHTML = renderMolPanel(data.b);
+
+                // Descriptor diff
+                const tbody = document.getElementById("cmp-diff-tbody");
+                tbody.innerHTML = "";
+                (data.descriptor_diff || []).forEach(row => {
+                    const tr = document.createElement("tr");
+                    const fmt = v => v === null || v === undefined ? "—"
+                        : (Math.abs(v) >= 100 ? v.toFixed(1) : v.toFixed(3));
+                    const delta = row.delta;
+                    let deltaColor = "var(--text-muted)";
+                    let arrow = "";
+                    if (delta !== null && delta !== undefined) {
+                        if (delta > 0.001) { deltaColor = "#10b981"; arrow = "▲ "; }
+                        else if (delta < -0.001) { deltaColor = "#f87171"; arrow = "▼ "; }
+                    }
+                    tr.innerHTML = `
+                        <td><strong>${row.name}</strong></td>
+                        <td>${fmt(row.a)}</td>
+                        <td>${fmt(row.b)}</td>
+                        <td style="color:${deltaColor};font-weight:600;">${arrow}${fmt(delta)}</td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+
+                cmpResults.classList.remove("hidden");
+            } catch (err) {
+                alert(err.message);
+            } finally {
+                cmpBtn.disabled = false;
+                cmpBtn.textContent = "🔬 Compare";
+            }
+        });
+    }
+
+    document.querySelector('[data-tab="compare"]')?.addEventListener("click", () => {
+        if (lastPredictedSmiles && cmpA && !cmpA.value) cmpA.value = lastPredictedSmiles;
+    });
+
+    // ── Isomers Tab ─────────────────────────────────────────────────────────
+    const isoBtn = document.getElementById("iso-btn");
+    const isoSmiles = document.getElementById("iso-smiles");
+    const isoMaxTaut = document.getElementById("iso-max-taut");
+    const isoMaxStereo = document.getElementById("iso-max-stereo");
+    const isoResults = document.getElementById("iso-results");
+
+    function renderIsomerCard(item, accent) {
+        const isCan = item.is_canonical;
+        const border = isCan ? `2px solid ${accent}` : `1px solid rgba(255,255,255,0.08)`;
+        const badge = isCan
+            ? `<span style="font-size:0.65rem;padding:0.15rem 0.4rem;background:${accent}20;color:${accent};border-radius:8px;font-weight:600;margin-left:0.5rem;">CANONICAL</span>`
+            : "";
+        return `
+            <div style="padding:0.7rem 0.9rem;background:rgba(255,255,255,0.03);border:${border};border-radius:8px;">
+                <div style="display:flex;align-items:center;flex-wrap:wrap;">
+                    <span style="font-family:monospace;font-size:0.82rem;word-break:break-all;">${item.smiles}</span>
+                    ${badge}
+                </div>
+                <button class="btn-secondary" style="margin-top:0.4rem;padding:0.2rem 0.6rem;font-size:0.7rem;" onclick="navigator.clipboard.writeText('${item.smiles}')">📋 Copy</button>
+            </div>`;
+    }
+
+    if (isoBtn) {
+        isoBtn.addEventListener("click", async () => {
+            const smiles = isoSmiles.value.trim();
+            if (!smiles) { alert("Enter a SMILES string"); return; }
+
+            isoBtn.disabled = true;
+            isoBtn.textContent = "⏳ Enumerating…";
+            isoResults.classList.add("hidden");
+
+            try {
+                const resp = await fetch("/isomers", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        smiles,
+                        max_tautomers: parseInt(isoMaxTaut.value) || 25,
+                        max_stereoisomers: parseInt(isoMaxStereo.value) || 16
+                    })
+                });
+                const data = await resp.json();
+                if (!resp.ok) throw new Error(data.detail || "Enumeration failed");
+
+                document.getElementById("iso-canonical").textContent =
+                    data.canonical_tautomer || "(none)";
+                document.getElementById("iso-taut-count").textContent =
+                    `${data.n_tautomers} tautomer${data.n_tautomers === 1 ? "" : "s"}`;
+                document.getElementById("iso-stereo-count").textContent =
+                    `${data.n_stereoisomers} stereoisomer${data.n_stereoisomers === 1 ? "" : "s"}`;
+
+                document.getElementById("iso-taut-list").innerHTML =
+                    data.tautomers.map(t => renderIsomerCard(t, "#a78bfa")).join("");
+                document.getElementById("iso-stereo-list").innerHTML =
+                    data.stereoisomers.map(s => renderIsomerCard(s, "#06b6d4")).join("");
+
+                isoResults.classList.remove("hidden");
+            } catch (err) {
+                alert(err.message);
+            } finally {
+                isoBtn.disabled = false;
+                isoBtn.textContent = "🧬 Enumerate";
+            }
+        });
+    }
+
+    document.querySelector('[data-tab="isomers"]')?.addEventListener("click", () => {
+        if (lastPredictedSmiles && isoSmiles && !isoSmiles.value) isoSmiles.value = lastPredictedSmiles;
+    });
+
     // Enter key support
     smilesInput.addEventListener("keypress", (e) => { if (e.key === "Enter") predictBtn.click(); });
 });

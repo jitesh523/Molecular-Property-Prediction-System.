@@ -38,6 +38,7 @@ from molprop.features.fingerprints import smiles_to_maccs, tanimoto_similarity
 from molprop.features.functional_groups import detect_functional_groups
 from molprop.features.graphs import smiles_to_graph
 from molprop.features.isomers import enumerate_isomers
+from molprop.features.mcs import find_mcs
 from molprop.features.scaffolds import analyze_scaffold
 from molprop.features.substructure import substructure_search
 from molprop.models.explain import explain_graph, get_explainer
@@ -1702,6 +1703,180 @@ async def library_delete(compound_id: int):
     if not library.delete(compound_id):
         raise HTTPException(status_code=404, detail=f"Compound {compound_id} not found")
     return {"status": "deleted", "id": compound_id}
+
+
+# ── Library CSV import / export ───────────────────────────────────────────────
+
+
+@app.get("/library/export/csv", tags=["Library"])
+async def library_export_csv(project: Optional[str] = None):
+    """Export the (filtered) library as CSV (text/csv response)."""
+    import csv
+    import io
+
+    from fastapi.responses import Response
+
+    rows = library.list(project=project, limit=100000)
+    buf = io.StringIO()
+    writer = csv.writer(buf)
+    writer.writerow(
+        ["id", "smiles", "name", "project", "tags", "notes", "created_at", "updated_at"]
+    )
+    for r in rows:
+        writer.writerow(
+            [
+                r.get("id", ""),
+                r.get("smiles", ""),
+                r.get("name", "") or "",
+                r.get("project", "") or "",
+                ";".join(r.get("tags", []) or []),
+                (r.get("notes", "") or "").replace("\n", " "),
+                r.get("created_at", "") or "",
+                r.get("updated_at", "") or "",
+            ]
+        )
+    return Response(
+        content=buf.getvalue(),
+        media_type="text/csv",
+        headers={"Content-Disposition": "attachment; filename=library.csv"},
+    )
+
+
+class LibraryImportRow(BaseModel):
+    smiles: str = Field(..., max_length=MAX_SMILES_LEN)
+    name: Optional[str] = None
+    project: str = "default"
+    tags: list[str] = Field(default_factory=list)
+    notes: Optional[str] = None
+
+
+class LibraryImportRequest(BaseModel):
+    rows: list[LibraryImportRow] = Field(..., max_length=10000)
+
+
+@app.post("/library/import", tags=["Library"])
+async def library_import(req: LibraryImportRequest):
+    """Bulk-import compounds (idempotent upsert per `(smiles, project)`)."""
+    n_added = 0
+    n_failed = 0
+    errors: list[dict] = []
+    for i, row in enumerate(req.rows):
+        try:
+            library.add(
+                row.smiles,
+                name=row.name,
+                project=row.project,
+                tags=row.tags,
+                notes=row.notes,
+            )
+            n_added += 1
+        except Exception as e:  # noqa: BLE001
+            n_failed += 1
+            errors.append({"row": i, "smiles": row.smiles, "error": str(e)})
+    return {
+        "n_requested": len(req.rows),
+        "n_added": n_added,
+        "n_failed": n_failed,
+        "errors": errors[:50],
+    }
+
+
+# ── Maximum Common Substructure (MCS) ─────────────────────────────────────────
+
+
+class MCSRequest(BaseModel):
+    smiles_a: str = Field(..., max_length=MAX_SMILES_LEN)
+    smiles_b: str = Field(..., max_length=MAX_SMILES_LEN)
+    timeout: int = Field(5, ge=1, le=30)
+    complete_rings_only: bool = True
+    ring_matches_ring_only: bool = True
+
+
+@app.post("/mcs", tags=["Cheminformatics"])
+async def mcs_endpoint(req: MCSRequest):
+    """
+    Find the maximum common substructure between two molecules.
+
+    Returns the MCS SMARTS, atom counts, fractional coverage of each
+    molecule, and the matching atom indices in each.
+    """
+    result = find_mcs(
+        req.smiles_a,
+        req.smiles_b,
+        timeout=req.timeout,
+        complete_rings_only=req.complete_rings_only,
+        ring_matches_ring_only=req.ring_matches_ring_only,
+    )
+    if result is None:
+        raise HTTPException(status_code=422, detail="Invalid SMILES input")
+    return result.to_dict()
+
+
+# ── Structural Alerts (PAINS, Brenk, NIH) ─────────────────────────────────────
+
+
+class AlertsRequest(BaseModel):
+    smiles: str = Field(..., max_length=MAX_SMILES_LEN)
+    catalogs: list[str] = Field(
+        default_factory=lambda: ["PAINS", "BRENK", "NIH"],
+        description="Subset of {PAINS, PAINS_A, PAINS_B, PAINS_C, BRENK, NIH, ZINC}",
+    )
+
+
+@app.post("/alerts", tags=["Cheminformatics"])
+async def structural_alerts(req: AlertsRequest):
+    """
+    Run RDKit's FilterCatalog against the molecule.
+
+    Detects PAINS (Pan-Assay INterference compoundS), Brenk reactive groups,
+    NIH unfavourable groups, and ZINC druglike filters. Reports each flagged
+    substructure with its catalog, description, and matching atom indices.
+    """
+    from rdkit import Chem
+    from rdkit.Chem import FilterCatalog
+
+    mol = Chem.MolFromSmiles(req.smiles)
+    if mol is None:
+        raise HTTPException(status_code=422, detail=f"Invalid SMILES: '{req.smiles}'")
+
+    catalog_map = {
+        "PAINS": FilterCatalog.FilterCatalogParams.FilterCatalogs.PAINS,
+        "PAINS_A": FilterCatalog.FilterCatalogParams.FilterCatalogs.PAINS_A,
+        "PAINS_B": FilterCatalog.FilterCatalogParams.FilterCatalogs.PAINS_B,
+        "PAINS_C": FilterCatalog.FilterCatalogParams.FilterCatalogs.PAINS_C,
+        "BRENK": FilterCatalog.FilterCatalogParams.FilterCatalogs.BRENK,
+        "NIH": FilterCatalog.FilterCatalogParams.FilterCatalogs.NIH,
+        "ZINC": FilterCatalog.FilterCatalogParams.FilterCatalogs.ZINC,
+    }
+
+    params = FilterCatalog.FilterCatalogParams()
+    requested = [c.upper() for c in req.catalogs]
+    for name in requested:
+        if name in catalog_map:
+            params.AddCatalog(catalog_map[name])
+    catalog = FilterCatalog.FilterCatalog(params)
+
+    alerts: list[dict] = []
+    counts: dict[str, int] = {}
+    for entry in catalog.GetMatches(mol):
+        cat = entry.GetProp("FilterSet") if entry.HasProp("FilterSet") else "Unknown"
+        desc = entry.GetDescription()
+        atoms = []
+        try:
+            for match in entry.GetFilterMatches(mol):
+                atoms.extend(list(match.atomPairs))
+        except Exception:
+            atoms = []
+        alerts.append({"catalog": cat, "description": desc, "atom_pairs": atoms[:20]})
+        counts[cat] = counts.get(cat, 0) + 1
+
+    return {
+        "smiles": req.smiles,
+        "n_alerts": len(alerts),
+        "counts_by_catalog": counts,
+        "is_clean": len(alerts) == 0,
+        "alerts": alerts,
+    }
 
 
 # ── Conformer Endpoint ────────────────────────────────────────────────────────

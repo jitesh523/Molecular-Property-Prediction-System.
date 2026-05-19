@@ -940,6 +940,18 @@
                         <div id="fg-list" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 0.6rem;"></div>
                         <p id="fg-empty" class="hidden" style="color: var(--text-muted); text-align: center; padding: 1rem;">No common functional groups detected.</p>
                     </div>
+
+                    <!-- Structural alerts (PAINS/Brenk/NIH) -->
+                    <div class="glass-panel" style="padding: 1.5rem; margin-top: 1rem;">
+                        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.5rem;margin-bottom:0.75rem;">
+                            <h3 style="margin:0;">🚨 Structural Alerts</h3>
+                            <span id="alerts-summary" class="gen-stats"></span>
+                        </div>
+                        <div id="alerts-clean" class="hidden" style="padding:0.8rem;background:rgba(16,185,129,0.1);border:1px solid #10b981;border-radius:8px;color:#10b981;text-align:center;font-weight:600;">
+                            ✅ Clean — no PAINS / Brenk / NIH alerts detected
+                        </div>
+                        <div id="alerts-list" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 0.6rem;"></div>
+                    </div>
                 </div>
             </section>
 
@@ -983,6 +995,25 @@
                         <div class="glass-panel" style="padding: 1.25rem;">
                             <h3 style="margin-bottom: 0.75rem;">Molecule B</h3>
                             <div id="cmp-b-info"></div>
+                        </div>
+                    </div>
+
+                    <!-- MCS panel -->
+                    <div class="glass-panel" style="padding: 1.25rem; margin-top: 1rem;">
+                        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.5rem;margin-bottom:0.75rem;">
+                            <h3 style="margin:0;">🔗 Maximum Common Substructure</h3>
+                            <span id="mcs-stats" class="gen-stats"></span>
+                        </div>
+                        <div id="mcs-smarts" style="font-family:monospace;font-size:0.85rem;word-break:break-all;padding:0.75rem;background:rgba(0,0,0,0.25);border-radius:6px;color:var(--text-muted);">—</div>
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-top:0.75rem;">
+                            <div>
+                                <div style="font-size:0.75rem;color:var(--text-muted);text-transform:uppercase;">Coverage of A</div>
+                                <div id="mcs-cov-a" style="font-size:1.4rem;font-weight:700;">—</div>
+                            </div>
+                            <div>
+                                <div style="font-size:0.75rem;color:var(--text-muted);text-transform:uppercase;">Coverage of B</div>
+                                <div id="mcs-cov-b" style="font-size:1.4rem;font-weight:700;">—</div>
+                            </div>
                         </div>
                     </div>
 

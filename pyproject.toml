@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "molprop"
-version = "2.16.0"
+version = "2.20.0"
 description = "A production-grade, end-to-end platform for predicting molecular properties using GNNs."
 keywords = ["molecular-informatics", "gnn", "mlops", "drug-discovery", "pytorch-geometric"]
 license = { text = "MIT" }
@@ -47,6 +47,7 @@ dependencies = [
 ]
 
 [project.scripts]
+molprop = "molprop.cli:main"
 molprop-dashboard = "molprop.scripts.portfolio_dashboard:main"
 molprop-train = "molprop.scripts.train_gnn:main"
 

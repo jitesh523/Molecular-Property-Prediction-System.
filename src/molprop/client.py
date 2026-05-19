@@ -177,6 +177,31 @@ class MolpropClient:
     def compare(self, smiles_a: str, smiles_b: str) -> dict:
         return self._post("/compare", {"smiles_a": smiles_a, "smiles_b": smiles_b})
 
+    def mcs(
+        self,
+        smiles_a: str,
+        smiles_b: str,
+        timeout: int = 5,
+        complete_rings_only: bool = True,
+        ring_matches_ring_only: bool = True,
+    ) -> dict:
+        return self._post(
+            "/mcs",
+            {
+                "smiles_a": smiles_a,
+                "smiles_b": smiles_b,
+                "timeout": timeout,
+                "complete_rings_only": complete_rings_only,
+                "ring_matches_ring_only": ring_matches_ring_only,
+            },
+        )
+
+    def alerts(self, smiles: str, catalogs: Optional[list[str]] = None) -> dict:
+        body: dict[str, Any] = {"smiles": smiles}
+        if catalogs is not None:
+            body["catalogs"] = catalogs
+        return self._post("/alerts", body)
+
     def standardize(self, smiles: str) -> dict:
         return self._post("/standardize", {"smiles": smiles})
 

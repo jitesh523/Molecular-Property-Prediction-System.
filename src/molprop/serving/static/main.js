@@ -1981,6 +1981,42 @@ document.addEventListener("DOMContentLoaded", () => {
                 } catch (fgErr) {
                     console.warn("Functional group detection failed:", fgErr);
                 }
+
+                // Also fetch structural alerts
+                try {
+                    const alertsResp = await fetch("/alerts", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ smiles, catalogs: ["PAINS", "BRENK", "NIH"] })
+                    });
+                    const al = await alertsResp.json();
+                    if (alertsResp.ok) {
+                        const cleanEl = document.getElementById("alerts-clean");
+                        const listEl = document.getElementById("alerts-list");
+                        const sumEl = document.getElementById("alerts-summary");
+                        sumEl.textContent = `${al.n_alerts} alert${al.n_alerts === 1 ? "" : "s"}`;
+                        listEl.innerHTML = "";
+                        if (al.is_clean) {
+                            cleanEl.classList.remove("hidden");
+                        } else {
+                            cleanEl.classList.add("hidden");
+                            const catColors = { PAINS: "#ef4444", PAINS_A: "#ef4444", PAINS_B: "#f97316", PAINS_C: "#fbbf24", BRENK: "#a855f7", NIH: "#0ea5e9", ZINC: "#22c55e" };
+                            al.alerts.forEach(a => {
+                                const c = catColors[a.catalog] || "#64748b";
+                                const card = document.createElement("div");
+                                card.style.cssText = `padding:0.7rem 0.9rem;border-left:3px solid ${c};background:rgba(255,255,255,0.03);border-radius:6px;`;
+                                card.innerHTML = `
+                                    <div style="display:flex;justify-content:space-between;align-items:center;gap:0.5rem;flex-wrap:wrap;">
+                                        <span style="font-weight:600;color:white;font-size:0.9rem;">${a.description}</span>
+                                        <span style="font-size:0.72rem;color:${c};font-weight:700;padding:0.15rem 0.5rem;border:1px solid ${c};border-radius:8px;">${a.catalog}</span>
+                                    </div>`;
+                                listEl.appendChild(card);
+                            });
+                        }
+                    }
+                } catch (alErr) {
+                    console.warn("Structural alerts failed:", alErr);
+                }
             } catch (err) {
                 alert(err.message);
             } finally {
@@ -2117,6 +2153,25 @@ document.addEventListener("DOMContentLoaded", () => {
                 });
 
                 cmpResults.classList.remove("hidden");
+
+                // Fetch MCS in the background
+                try {
+                    const mcsResp = await fetch("/mcs", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ smiles_a: a, smiles_b: b })
+                    });
+                    const mcs = await mcsResp.json();
+                    if (mcsResp.ok) {
+                        document.getElementById("mcs-smarts").textContent = mcs.smarts || "(no common substructure)";
+                        document.getElementById("mcs-cov-a").textContent =
+                            (mcs.a_coverage * 100).toFixed(1) + "%";
+                        document.getElementById("mcs-cov-b").textContent =
+                            (mcs.b_coverage * 100).toFixed(1) + "%";
+                        document.getElementById("mcs-stats").textContent =
+                            `${mcs.n_atoms} atoms, ${mcs.n_bonds} bonds`;
+                    }
+                } catch (e) { console.warn("MCS failed:", e); }
             } catch (err) {
                 alert(err.message);
             } finally {

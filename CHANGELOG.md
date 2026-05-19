@@ -5,6 +5,35 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.20.0] - 2026-05-19
+
+### Added — CLI, MCS, structural alerts, library CSV I/O, API integration tests
+
+- **🖥️ v2.17.0 — Command-line interface** (`src/molprop/cli.py`)
+  - `molprop` entry-point registered in `pyproject.toml`.
+  - Click-based CLI wrapping every SDK method with typed flags and a `--pretty/--compact` JSON output toggle.
+  - Subcommands: `health`, `version`, `predict`, `scaffold`, `fg`, `isomers`, `compare`, `mcs`, `alerts`, `standardize`, `admet`, `substructure`, `report` (with `-o file.md`), and a `library` subgroup (`save`, `list`, `get`, `delete`, `projects`).
+  - Uniform `MolpropAPIError` → coloured stderr + non-zero exit code.
+
+- **🔗 v2.18.0 — Maximum Common Substructure + Library CSV I/O**
+  - New module `src/molprop/features/mcs.py` wrapping `rdFMCS.FindMCS` with ring-aware defaults.
+  - New `POST /mcs` returns SMARTS, atom/bond counts, fractional coverage of each molecule, and matching atom indices.
+  - New `GET /library/export/csv` streams the (optionally project-filtered) library as a CSV download.
+  - New `POST /library/import` bulk-upserts up to 10,000 rows with per-row error reporting.
+
+- **🚨 v2.19.0 — Structural Alerts** (PAINS, Brenk, NIH, ZINC)
+  - New `POST /alerts` endpoint backed by RDKit's `FilterCatalog`.
+  - Configurable catalogs: `PAINS`, `PAINS_A`, `PAINS_B`, `PAINS_C`, `BRENK`, `NIH`, `ZINC`.
+  - Reports each flagged substructure with its catalog name, description, and atom-pair indices for highlighting; surfaces an `is_clean` boolean for quick filtering.
+
+- **🧪 v2.20.0 — API integration tests** (`tests/test_api_integration.py`)
+  - End-to-end tests via FastAPI's `TestClient` covering scaffold, functional groups, isomers, substructure, compare, standardize, MCS, alerts, report, and a full Library CRUD round-trip (incl. CSV import/export).
+  - 14 tests; ML-heavy endpoints are deliberately omitted to keep the suite CI-friendly.
+
+### Polish
+- **UI wiring** — Compare tab now also shows the **🔗 Maximum Common Substructure** panel (SMARTS, atom/bond counts, fractional coverage of each molecule). Scaffold tab now also shows the **🚨 Structural Alerts** panel (PAINS / Brenk / NIH) with green "clean" state and red/orange/yellow severity-coloured hit cards.
+- **Documentation** — new `docs/CLI_AND_SDK.md` with full SDK + CLI reference, end-to-end example pipeline, and a method index.
+
 ## [2.16.0] - 2026-05-18
 
 ### Added — UI completion, test coverage, and a Python SDK

@@ -2256,6 +2256,77 @@ document.addEventListener("DOMContentLoaded", () => {
         if (lastPredictedSmiles && isoSmiles && !isoSmiles.value) isoSmiles.value = lastPredictedSmiles;
     });
 
+    // ── Substructure Tab ────────────────────────────────────────────────────
+    const subBtn = document.getElementById("sub-btn");
+    const subQuery = document.getElementById("sub-query");
+    const subProject = document.getElementById("sub-project");
+    const subLimit = document.getElementById("sub-limit");
+    const subCandidates = document.getElementById("sub-candidates");
+    const subResults = document.getElementById("sub-results");
+    const subTbody = document.getElementById("sub-tbody");
+    const subEmpty = document.getElementById("sub-empty");
+    const subStats = document.getElementById("sub-stats");
+
+    if (subBtn) {
+        subBtn.addEventListener("click", async () => {
+            const query = subQuery.value.trim();
+            if (!query) { alert("Enter a SMARTS or SMILES pattern"); return; }
+
+            const body = {
+                query,
+                limit: parseInt(subLimit.value) || 100
+            };
+            const project = subProject.value.trim();
+            if (project) body.project = project;
+            const candText = subCandidates.value.trim();
+            if (candText) {
+                body.candidates = candText.split("\n").map(s => s.trim()).filter(Boolean);
+            }
+
+            subBtn.disabled = true;
+            subBtn.textContent = "⏳ Searching…";
+            subResults.classList.add("hidden");
+
+            try {
+                const resp = await fetch("/substructure", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(body)
+                });
+                const data = await resp.json();
+                if (!resp.ok) throw new Error(data.detail || "Search failed");
+
+                const stats = data.stats || {};
+                subStats.textContent =
+                    `${stats.n_matches} / ${stats.n_searched} matched` +
+                    (stats.n_invalid ? ` · ${stats.n_invalid} invalid skipped` : "");
+
+                subTbody.innerHTML = "";
+                if ((data.matches || []).length === 0) {
+                    subEmpty.classList.remove("hidden");
+                } else {
+                    subEmpty.classList.add("hidden");
+                    data.matches.forEach((m, i) => {
+                        const tr = document.createElement("tr");
+                        tr.innerHTML = `
+                            <td style="color:var(--text-muted);">${i + 1}</td>
+                            <td style="font-family:monospace;font-size:0.82rem;word-break:break-all;">${m.smiles}</td>
+                            <td>${m.name || "—"}</td>
+                            <td style="font-weight:700;color:var(--accent-color);">×${m.n_matches}</td>
+                        `;
+                        subTbody.appendChild(tr);
+                    });
+                }
+                subResults.classList.remove("hidden");
+            } catch (err) {
+                alert(err.message);
+            } finally {
+                subBtn.disabled = false;
+                subBtn.textContent = "🔎 Search";
+            }
+        });
+    }
+
     // Enter key support
     smilesInput.addEventListener("keypress", (e) => { if (e.key === "Enter") predictBtn.click(); });
 });

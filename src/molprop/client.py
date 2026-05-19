@@ -196,6 +196,9 @@ class MolpropClient:
             },
         )
 
+    def rgroups(self, core: str, smiles_list: list[str]) -> dict:
+        return self._post("/rgroups", {"core": core, "smiles_list": smiles_list})
+
     def alerts(self, smiles: str, catalogs: Optional[list[str]] = None) -> dict:
         body: dict[str, Any] = {"smiles": smiles}
         if catalogs is not None:

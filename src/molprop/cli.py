@@ -163,6 +163,19 @@ def mcs(ctx: click.Context, smiles_a: str, smiles_b: str) -> None:
 
 
 @cli.command()
+@click.argument("core")
+@click.argument("smiles_file", type=click.Path(exists=True))
+@click.pass_context
+@_handle_errors
+def rgroups(ctx: click.Context, core: str, smiles_file: str) -> None:
+    """R-group decomposition. Reads one SMILES per line from SMILES_FILE."""
+    smiles_list = [
+        line.strip() for line in Path(smiles_file).read_text().splitlines() if line.strip()
+    ]
+    _emit(ctx, _client(ctx).rgroups(core, smiles_list))
+
+
+@cli.command()
 @click.argument("smiles")
 @click.option(
     "--catalog",

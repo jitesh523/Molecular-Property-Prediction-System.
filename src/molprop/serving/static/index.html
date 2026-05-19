@@ -67,6 +67,9 @@
             <button class="tab-btn" data-tab="isomers">
                 <span class="tab-icon">🧬</span> Isomers
             </button>
+            <button class="tab-btn" data-tab="substructure">
+                <span class="tab-icon">🔎</span> Substruct
+            </button>
         </nav>
 
         <main>
@@ -1079,6 +1082,57 @@
                             <span id="iso-stereo-count" class="gen-stats"></span>
                         </div>
                         <div id="iso-stereo-list" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 0.5rem;"></div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ══════════════════════════════════════════════════════════════
+                 TAB 15 – SUBSTRUCTURE SEARCH
+            ══════════════════════════════════════════════════════════════ -->
+            <section id="tab-substructure" class="tab-panel hidden">
+                <div class="input-section glass-panel fade-in slide-up">
+                    <h2>🔎 Substructure SMARTS Search</h2>
+                    <p class="section-desc">Search the compound library — or a custom list of SMILES — for molecules containing a given SMARTS / SMILES pattern.</p>
+
+                    <div style="display: grid; grid-template-columns: 2fr 1fr 1fr auto; gap: 0.75rem; align-items: end; margin-top: 1rem;">
+                        <div>
+                            <label for="sub-query">Query pattern (SMARTS or SMILES)</label>
+                            <input type="text" id="sub-query" placeholder="e.g. c1ccccc1 or [CX3](=O)[OX2H1]" style="width:100%;">
+                        </div>
+                        <div>
+                            <label for="sub-project">Project (optional)</label>
+                            <input type="text" id="sub-project" placeholder="all projects" style="width:100%;">
+                        </div>
+                        <div>
+                            <label for="sub-limit">Limit</label>
+                            <input type="number" id="sub-limit" value="100" min="1" max="500" style="width:100%;">
+                        </div>
+                        <button id="sub-btn" class="btn-primary" style="padding:0.6rem 1.5rem;">🔎 Search</button>
+                    </div>
+
+                    <details style="margin-top: 0.75rem; color: var(--text-muted); font-size: 0.85rem;">
+                        <summary style="cursor:pointer;">📝 Use custom candidate list instead of library</summary>
+                        <textarea id="sub-candidates" rows="4" placeholder="One SMILES per line — leave blank to search the saved library" style="width:100%; margin-top:0.4rem; font-family:monospace; padding:0.5rem;"></textarea>
+                    </details>
+                </div>
+
+                <div id="sub-results" class="hidden slide-up" style="margin-top: 1rem;">
+                    <div class="glass-panel" style="padding: 1.25rem;">
+                        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.5rem;margin-bottom:0.75rem;">
+                            <h3 style="margin:0;">🎯 Matches</h3>
+                            <span id="sub-stats" class="gen-stats"></span>
+                        </div>
+                        <div style="overflow-x:auto;">
+                            <table class="compare-table">
+                                <thead>
+                                    <tr><th>#</th><th>SMILES</th><th>Name</th><th>Hits</th></tr>
+                                </thead>
+                                <tbody id="sub-tbody"></tbody>
+                            </table>
+                        </div>
+                        <p id="sub-empty" class="hidden" style="text-align:center;padding:1.5rem;color:var(--text-muted);">
+                            No matches found.
+                        </p>
                     </div>
                 </div>
             </section>

@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.24.0] - 2026-05-19
+
+### Added
+
+- **🛡️ v2.21.0 — Verified CI / pre-commit** — confirmed existing `.github/workflows/ci.yml` (matrix Python 3.11/3.12 + ruff + bandit + pytest-cov) and `.pre-commit-config.yaml` (ruff + ruff-format + standard hygiene hooks). No code changes — documenting that they remain green with all new modules.
+- **📝 v2.22.0 — README modernisation** — new top-of-README "What's New in v2.x" section: tabular endpoint index (30+ endpoints), 14 UI tabs listed with highlights, copy-pasteable SDK + CLI snippets, test-suite invocation. Makes the cheminformatics suite discoverable for portfolio reviewers.
+- **🔎 v2.23.0 — Substructure tab** — new standalone UI tab for `POST /substructure`:
+  - SMARTS / SMILES query box, optional project scope, configurable limit.
+  - Collapsible textarea to paste a custom candidate list instead of searching the saved library.
+  - Sortable results table with rank, SMILES, name, and hit-count badge.
+- **🧬 v2.24.0 — R-group decomposition** — new module `src/molprop/features/rgroups.py` wrapping RDKit's `rdRGroupDecomposition`:
+  - `POST /rgroups` accepts a core (SMARTS / SMILES) plus an analogue list, returns per-molecule R-group assignments, unique R-groups per position, and matched / unmatched counts.
+  - Exposed in the SDK (`client.rgroups`) and the CLI (`molprop rgroups <core> <smiles_file>`).
+
 ## [2.20.0] - 2026-05-19
 
 ### Added — CLI, MCS, structural alerts, library CSV I/O, API integration tests

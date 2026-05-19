@@ -11,7 +11,79 @@ A production-grade, end-to-end machine learning platform for predicting molecula
 
 ---
 
-## 🏗️ Architecture
+## � What's New in v2.x — Cheminformatics Suite
+
+A full cheminformatics layer has been added on top of the original GNN platform.
+Every feature is exposed via REST API, the Python SDK (`molprop.client`), and
+the `molprop` command-line tool.
+
+### REST endpoints (30+)
+
+| Domain | Endpoints |
+|---|---|
+| **Prediction** | `POST /predict`, `POST /predict/batch` |
+| **Generation** | `POST /generate`, `POST /generate/smart` (constrained by MW/LogP/QED/TPSA) |
+| **ADMET** | `POST /admet`, `POST /admet/batch` |
+| **Cheminformatics** | `POST /scaffold`, `POST /scaffold/batch`, `POST /functional_groups`, `POST /isomers`, `POST /substructure`, `POST /compare`, `POST /mcs`, `POST /alerts`, `POST /standardize`, `POST /conformer` |
+| **Similarity** | `POST /search/similar` (Morgan / MACCS Tanimoto) |
+| **Reports** | `POST /report` (one-click Markdown report) |
+| **Library** | `POST /library`, `GET /library`, `GET /library/{id}`, `PATCH /library/{id}`, `DELETE /library/{id}`, `GET /library/projects`, `GET /library/export/csv`, `POST /library/import` |
+
+### Premium UI — 14 tabs
+
+`Predict` · `Generate` · `Optimize` · `History` · `Visualize` · `ADMET` ·
+`Batch` · `Search` · `3D View` · `Dashboard` · `Library` · `Scaffold` ·
+`Compare` · `Isomers`
+
+Highlights:
+- **Scaffold tab** — gradient SAScore meter (1 = easy → 10 = hard), ring topology cards, functional-group chips, **PAINS / Brenk / NIH structural alerts**.
+- **Compare tab** — colour-coded MACCS Tanimoto headline, side-by-side drug-likeness panels, **Maximum Common Substructure (MCS)** with coverage %, descriptor delta table.
+- **Isomers tab** — tautomer & stereoisomer enumeration with canonical-tautomer highlighting.
+- **Library tab** — persistent SQLite-backed CRUD, projects, tags, full-text search, CSV import/export.
+
+### Python SDK
+
+```python
+from molprop.client import MolpropClient
+c = MolpropClient("http://localhost:8000")
+
+c.predict("CC(=O)Oc1ccccc1C(=O)O")
+c.scaffold("CC(=O)NC1=CC=C(O)C=C1")          # Bemis–Murcko + SAScore
+c.mcs("CC(=O)Oc1ccccc1C(=O)O", "CC(=O)Nc1ccc(O)cc1")
+c.alerts("Cc1ccc(cc1)/N=N/c2ccc(cc2)N(C)C")  # PAINS / Brenk / NIH
+c.library_save("CCO", project="solvents", tags=["polar"])
+c.substructure("c1ccccc1", project="solvents")
+```
+
+26 typed methods, uniform `MolpropAPIError` for non-2xx responses. See `docs/CLI_AND_SDK.md`.
+
+### Command-line interface
+
+```bash
+molprop predict "CC(=O)Oc1ccccc1C(=O)O"
+molprop scaffold "CC(=O)NC1=CC=C(O)C=C1"
+molprop compare "CCO" "CCN"
+molprop alerts "Cc1ccc(cc1)/N=N/c2ccc(cc2)N(C)C" --catalog PAINS --catalog BRENK
+molprop report "aspirin_smiles_here" -o aspirin.md
+molprop library save "CCO" --name Ethanol --project drug-x --tag solvent
+molprop library list --project drug-x
+```
+
+`MOLPROP_URL` env-var overrides the API base. 19 subcommands total.
+
+### Tests
+
+- `tests/test_storage.py` — 9 tests (Library CRUD, upsert, persistence)
+- `tests/test_cheminformatics_features.py` — 18 tests (scaffolds, FG, isomers, substructure)
+- `tests/test_api_integration.py` — 14 end-to-end tests via FastAPI `TestClient`
+
+```bash
+pytest tests/test_storage.py tests/test_cheminformatics_features.py tests/test_api_integration.py -v
+```
+
+---
+
+## �🏗️ Architecture
 
 ```mermaid
 flowchart LR

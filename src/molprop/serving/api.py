@@ -39,6 +39,7 @@ from molprop.features.functional_groups import detect_functional_groups
 from molprop.features.graphs import smiles_to_graph
 from molprop.features.isomers import enumerate_isomers
 from molprop.features.mcs import find_mcs
+from molprop.features.rgroups import decompose_rgroups
 from molprop.features.scaffolds import analyze_scaffold
 from molprop.features.substructure import substructure_search
 from molprop.models.explain import explain_graph, get_explainer
@@ -1809,6 +1810,28 @@ async def mcs_endpoint(req: MCSRequest):
     )
     if result is None:
         raise HTTPException(status_code=422, detail="Invalid SMILES input")
+    return result.to_dict()
+
+
+# ── R-group Decomposition ─────────────────────────────────────────────────────
+
+
+class RGroupRequest(BaseModel):
+    core: str = Field(..., max_length=500, description="Core scaffold (SMARTS or SMILES)")
+    smiles_list: list[str] = Field(..., max_length=MAX_BATCH_SIZE)
+
+
+@app.post("/rgroups", tags=["Cheminformatics"])
+async def rgroup_decomposition(req: RGroupRequest):
+    """
+    Decompose a series of analogues around a common core scaffold.
+
+    Returns per-molecule R-group SMILES (R1, R2, …), aggregated unique
+    R-groups per position, and matched / unmatched counts.
+    """
+    result = decompose_rgroups(req.core, req.smiles_list)
+    if result is None:
+        raise HTTPException(status_code=422, detail=f"Invalid core: '{req.core}'")
     return result.to_dict()
 
 

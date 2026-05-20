@@ -5,6 +5,31 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.28.0] - 2026-05-20
+
+### Added — R-group UI, reactions, examples, Matched Molecular Pairs
+
+- **🧩 v2.25.0 — R-group decomposition UI tab** — new standalone tab wired to `POST /rgroups`:
+  - Core SMARTS/SMILES input + multi-line analogue textarea.
+  - KPI cards (matched / unmatched / R-positions) + unique-R-groups-per-position panel + per-molecule assignment table.
+
+- **⚗️ v2.26.0 — Reaction SMARTS application** — new `POST /react` and `GET /react/named` backed by `src/molprop/features/reactions.py`:
+  - Accepts either a raw reaction SMARTS or a `named:` key from a built-in catalog of common reactions: `amide_coupling`, `ester_hydrolysis`, `n_methylation`, `alcohol_to_aldehyde`, `suzuki_coupling`, `nitro_reduction`.
+  - Substrates are passed as reactant-tuples to support multi-reactant transformations.
+  - Returns per-input product sets + a flat list of unique canonical product SMILES.
+  - Exposed in the SDK (`client.react`, `client.react_named`) and CLI (`molprop react`, `molprop react-list`).
+
+- **📚 v2.27.0 — Worked-example walkthrough** — new `examples/` directory:
+  - `examples/01_sdk_walkthrough.py` — end-to-end Python tour exercising health, scaffold + SA, functional groups, compare + MCS, R-groups, reaction SMARTS, structural alerts, library CRUD, and the aggregated Markdown report against a panel of common drugs (aspirin, acetaminophen, ibuprofen, caffeine, ethanol).
+  - `examples/README.md` — accompanying recipe book with CLI mini-recipes (PAINS triage, substructure scan, batch reporting, reaction batch, named-reaction catalog).
+
+- **🔗 v2.28.0 — Matched Molecular Pairs (MMP)** — new module `src/molprop/features/mmp.py` implementing single-cut MMP analysis (Hussain & Rea 2010, JCIM 50, 339):
+  - Fragments each molecule along every non-ring acyclic single bond.
+  - Groups molecules by shared "context" fragment.
+  - Emits all unordered pairs with different substituents, including R_A, R_B, and Δheavy_atoms per pair.
+  - `POST /mmp` endpoint with configurable `max_substituent_atoms` and `max_pairs` caps.
+  - Exposed in the SDK (`client.mmp`) and CLI (`molprop mmp <smiles_file>`).
+
 ## [2.24.0] - 2026-05-19
 
 ### Added

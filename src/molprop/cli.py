@@ -176,6 +176,69 @@ def rgroups(ctx: click.Context, core: str, smiles_file: str) -> None:
 
 
 @cli.command()
+@click.option("--smarts", default=None, help="Reaction SMARTS string.")
+@click.option("--named", default=None, help="Named reaction key (see `molprop react-list`).")
+@click.argument("substrates_file", type=click.Path(exists=True))
+@click.pass_context
+@_handle_errors
+def react(
+    ctx: click.Context, smarts: Optional[str], named: Optional[str], substrates_file: str
+) -> None:
+    """
+    Apply a reaction SMARTS to substrate tuples.
+
+    SUBSTRATES_FILE has one tuple per line; reactants in a tuple are
+    separated by a TAB or a single space. Example for amide coupling::
+
+        CC(=O)O\tNCC
+        CCCC(=O)O\tNc1ccccc1
+    """
+    rows: list[list[str]] = []
+    for line in Path(substrates_file).read_text().splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        parts = [p for p in line.replace("\t", " ").split(" ") if p]
+        rows.append(parts)
+    _emit(ctx, _client(ctx).react(rows, smarts=smarts, named=named))
+
+
+@cli.command(name="react-list")
+@click.pass_context
+@_handle_errors
+def react_list(ctx: click.Context) -> None:
+    """List the built-in named reactions."""
+    _emit(ctx, _client(ctx).react_named())
+
+
+@cli.command()
+@click.argument("smiles_file", type=click.Path(exists=True))
+@click.option(
+    "--max-sub-atoms",
+    "max_substituent_atoms",
+    default=10,
+    show_default=True,
+    help="Drop cuts whose substituent has more heavy atoms than this.",
+)
+@click.option("--max-pairs", default=500, show_default=True)
+@click.pass_context
+@_handle_errors
+def mmp(ctx: click.Context, smiles_file: str, max_substituent_atoms: int, max_pairs: int) -> None:
+    """Single-cut Matched Molecular Pairs analysis. One SMILES per line."""
+    smiles_list = [
+        line.strip() for line in Path(smiles_file).read_text().splitlines() if line.strip()
+    ]
+    _emit(
+        ctx,
+        _client(ctx).mmp(
+            smiles_list,
+            max_substituent_atoms=max_substituent_atoms,
+            max_pairs=max_pairs,
+        ),
+    )
+
+
+@cli.command()
 @click.argument("smiles")
 @click.option(
     "--catalog",

@@ -199,6 +199,41 @@ class MolpropClient:
     def rgroups(self, core: str, smiles_list: list[str]) -> dict:
         return self._post("/rgroups", {"core": core, "smiles_list": smiles_list})
 
+    def react(
+        self,
+        substrates: list[list[str]],
+        smarts: Optional[str] = None,
+        named: Optional[str] = None,
+    ) -> dict:
+        """Apply a reaction SMARTS (or a named reaction) to substrate tuples."""
+        body: dict[str, Any] = {"substrates": substrates}
+        if smarts is not None:
+            body["smarts"] = smarts
+        if named is not None:
+            body["named"] = named
+        return self._post("/react", body)
+
+    def react_named(self) -> dict:
+        """Return the catalog of built-in named reactions."""
+        return self._get("/react/named")
+
+    def mmp(
+        self,
+        smiles_list: list[str],
+        names: Optional[list[str]] = None,
+        max_substituent_atoms: int = 10,
+        max_pairs: int = 500,
+    ) -> dict:
+        """Single-cut Matched Molecular Pairs analysis."""
+        body: dict[str, Any] = {
+            "smiles_list": smiles_list,
+            "max_substituent_atoms": max_substituent_atoms,
+            "max_pairs": max_pairs,
+        }
+        if names is not None:
+            body["names"] = names
+        return self._post("/mmp", body)
+
     def alerts(self, smiles: str, catalogs: Optional[list[str]] = None) -> dict:
         body: dict[str, Any] = {"smiles": smiles}
         if catalogs is not None:

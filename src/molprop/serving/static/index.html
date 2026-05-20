@@ -70,6 +70,9 @@
             <button class="tab-btn" data-tab="substructure">
                 <span class="tab-icon">🔎</span> Substruct
             </button>
+            <button class="tab-btn" data-tab="rgroups">
+                <span class="tab-icon">🧩</span> R-Groups
+            </button>
         </nav>
 
         <main>
@@ -1133,6 +1136,67 @@
                         <p id="sub-empty" class="hidden" style="text-align:center;padding:1.5rem;color:var(--text-muted);">
                             No matches found.
                         </p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ══════════════════════════════════════════════════════════════
+                 TAB 16 – R-GROUP DECOMPOSITION
+            ══════════════════════════════════════════════════════════════ -->
+            <section id="tab-rgroups" class="tab-panel hidden">
+                <div class="input-section glass-panel fade-in slide-up">
+                    <h2>🧩 R-Group Decomposition</h2>
+                    <p class="section-desc">Decompose a series of analogues around a common scaffold. Extracts R1, R2, … substituents and aggregates unique groups per position.</p>
+
+                    <div style="display: grid; grid-template-columns: 1fr; gap: 0.75rem; margin-top: 1rem;">
+                        <div>
+                            <label for="rg-core">Core scaffold (SMARTS or SMILES)</label>
+                            <input type="text" id="rg-core" placeholder="e.g. c1ccccc1 or c1ccc(*)cc1" style="width:100%;">
+                        </div>
+                        <div>
+                            <label for="rg-analogues">Analogue SMILES (one per line)</label>
+                            <textarea id="rg-analogues" rows="6" placeholder="c1ccc(O)cc1&#10;c1ccc(N)cc1&#10;c1ccc(C)cc1" style="width:100%; font-family:monospace; padding:0.5rem;"></textarea>
+                        </div>
+                        <button id="rg-btn" class="btn-primary" style="padding:0.6rem 1.5rem; justify-self:start;">🧩 Decompose</button>
+                    </div>
+                </div>
+
+                <div id="rg-results" class="hidden slide-up" style="margin-top: 1rem;">
+                    <!-- Summary -->
+                    <div class="glass-panel" style="padding: 1.25rem;">
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 1rem; text-align: center;">
+                            <div>
+                                <div style="font-size:0.75rem;color:var(--text-muted);text-transform:uppercase;">Matched</div>
+                                <div id="rg-matched" style="font-size:1.8rem;font-weight:700;color:#10b981;">0</div>
+                            </div>
+                            <div>
+                                <div style="font-size:0.75rem;color:var(--text-muted);text-transform:uppercase;">Unmatched</div>
+                                <div id="rg-unmatched" style="font-size:1.8rem;font-weight:700;color:#f87171;">0</div>
+                            </div>
+                            <div>
+                                <div style="font-size:0.75rem;color:var(--text-muted);text-transform:uppercase;">R-Positions</div>
+                                <div id="rg-npos" style="font-size:1.8rem;font-weight:700;color:var(--accent-color);">0</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Unique R-groups per position -->
+                    <div class="glass-panel" style="padding: 1.25rem; margin-top: 1rem;">
+                        <h3 style="margin-bottom: 0.75rem;">📦 Unique R-groups per position</h3>
+                        <div id="rg-unique"></div>
+                    </div>
+
+                    <!-- Per-molecule table -->
+                    <div class="glass-panel" style="padding: 1.25rem; margin-top: 1rem;">
+                        <h3 style="margin-bottom: 0.75rem;">📋 Per-Molecule Assignments</h3>
+                        <div style="overflow-x:auto;">
+                            <table class="compare-table">
+                                <thead>
+                                    <tr><th>#</th><th>SMILES</th><th>Status</th><th id="rg-th-r">R-Groups</th></tr>
+                                </thead>
+                                <tbody id="rg-tbody"></tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
             </section>

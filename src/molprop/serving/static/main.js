@@ -2327,6 +2327,87 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 
+    // ── R-Group Decomposition Tab ──────────────────────────────────────────
+    const rgBtn = document.getElementById("rg-btn");
+    const rgCore = document.getElementById("rg-core");
+    const rgAnalogues = document.getElementById("rg-analogues");
+    const rgResults = document.getElementById("rg-results");
+
+    if (rgBtn) {
+        rgBtn.addEventListener("click", async () => {
+            const core = rgCore.value.trim();
+            const lines = rgAnalogues.value.split("\n").map(s => s.trim()).filter(Boolean);
+            if (!core) { alert("Enter a core scaffold"); return; }
+            if (lines.length === 0) { alert("Enter at least one analogue SMILES"); return; }
+
+            rgBtn.disabled = true;
+            rgBtn.textContent = "⏳ Decomposing…";
+            rgResults.classList.add("hidden");
+
+            try {
+                const resp = await fetch("/rgroups", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ core, smiles_list: lines })
+                });
+                const data = await resp.json();
+                if (!resp.ok) throw new Error(data.detail || "Decomposition failed");
+
+                document.getElementById("rg-matched").textContent = data.n_matched;
+                document.getElementById("rg-unmatched").textContent = data.n_unmatched;
+                document.getElementById("rg-npos").textContent = (data.rgroup_labels || []).length;
+
+                // Unique per label
+                const uniq = document.getElementById("rg-unique");
+                uniq.innerHTML = "";
+                const labels = data.rgroup_labels || [];
+                if (labels.length === 0) {
+                    uniq.innerHTML = '<p style="color:var(--text-muted);text-align:center;">No R-positions detected.</p>';
+                } else {
+                    labels.forEach(lbl => {
+                        const items = (data.unique_per_label[lbl] || []);
+                        const block = document.createElement("div");
+                        block.style.cssText = "margin-bottom:0.75rem;";
+                        block.innerHTML = `
+                            <div style="font-weight:700;color:var(--accent-color);margin-bottom:0.3rem;">${lbl} <span style="color:var(--text-muted);font-weight:400;font-size:0.85rem;">(${items.length} unique)</span></div>
+                            <div style="display:flex;flex-wrap:wrap;gap:0.35rem;">
+                                ${items.map(s => `<span style="font-family:monospace;font-size:0.8rem;padding:0.25rem 0.55rem;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:6px;">${s}</span>`).join("")}
+                            </div>`;
+                        uniq.appendChild(block);
+                    });
+                }
+
+                // Per-molecule table
+                const tbody = document.getElementById("rg-tbody");
+                tbody.innerHTML = "";
+                (data.rows || []).forEach((row, i) => {
+                    const status = row.matched
+                        ? '<span style="color:#10b981;font-weight:600;">✅ matched</span>'
+                        : '<span style="color:#f87171;font-weight:600;">❌ no match</span>';
+                    const rg = row.matched
+                        ? Object.entries(row.r_groups || {})
+                            .map(([k, v]) => `<strong>${k}</strong>: <code style="font-family:monospace;">${v}</code>`)
+                            .join("&nbsp;&nbsp;·&nbsp;&nbsp;")
+                        : '<span style="color:var(--text-muted);">—</span>';
+                    const tr = document.createElement("tr");
+                    tr.innerHTML = `
+                        <td style="color:var(--text-muted);">${i + 1}</td>
+                        <td style="font-family:monospace;font-size:0.82rem;word-break:break-all;">${row.smiles}</td>
+                        <td>${status}</td>
+                        <td>${rg}</td>`;
+                    tbody.appendChild(tr);
+                });
+
+                rgResults.classList.remove("hidden");
+            } catch (err) {
+                alert(err.message);
+            } finally {
+                rgBtn.disabled = false;
+                rgBtn.textContent = "🧩 Decompose";
+            }
+        });
+    }
+
     // Enter key support
     smilesInput.addEventListener("keypress", (e) => { if (e.key === "Enter") predictBtn.click(); });
 });

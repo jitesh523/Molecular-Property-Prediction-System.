@@ -39,6 +39,8 @@ from molprop.features.functional_groups import detect_functional_groups
 from molprop.features.graphs import smiles_to_graph
 from molprop.features.isomers import enumerate_isomers
 from molprop.features.mcs import find_mcs
+from molprop.features.mmp import find_mmp
+from molprop.features.reactions import NAMED_REACTIONS, list_named_reactions, run_reaction
 from molprop.features.rgroups import decompose_rgroups
 from molprop.features.scaffolds import analyze_scaffold
 from molprop.features.substructure import substructure_search
@@ -1832,6 +1834,109 @@ async def rgroup_decomposition(req: RGroupRequest):
     result = decompose_rgroups(req.core, req.smiles_list)
     if result is None:
         raise HTTPException(status_code=422, detail=f"Invalid core: '{req.core}'")
+    return result.to_dict()
+
+
+# ── Reaction SMARTS application ───────────────────────────────────────────────
+
+
+class ReactRequest(BaseModel):
+    smarts: Optional[str] = Field(
+        None,
+        description="Reaction SMARTS string. Mutually exclusive with `named`.",
+    )
+    named: Optional[str] = Field(
+        None,
+        description=(
+            "Named reaction key (e.g. 'amide_coupling'). See GET /react/named for the catalog."
+        ),
+    )
+    substrates: list[list[str]] = Field(
+        ...,
+        max_length=MAX_BATCH_SIZE,
+        description=(
+            "List of reactant tuples. For a 1-reactant SMARTS pass "
+            "[[smi_a], [smi_b], ...]; for a 2-reactant SMARTS pass "
+            "[[smi_a, smi_b], ...]."
+        ),
+    )
+
+
+@app.get("/react/named", tags=["Cheminformatics"])
+async def react_named_catalog():
+    """Built-in named-reaction catalog (SMARTS + descriptions)."""
+    return {"reactions": list_named_reactions()}
+
+
+@app.post("/react", tags=["Cheminformatics"])
+async def react_endpoint(req: ReactRequest):
+    """
+    Apply a reaction SMARTS (or named reaction) to a list of substrate tuples.
+
+    Returns the unique canonical product SMILES for every set of reactant
+    matches, plus a flat list of all unique products across the batch.
+    """
+    if not req.smarts and not req.named:
+        raise HTTPException(
+            status_code=422,
+            detail="Provide either 'smarts' or 'named'.",
+        )
+    smarts = req.smarts
+    if req.named:
+        if req.named not in NAMED_REACTIONS:
+            raise HTTPException(
+                status_code=422,
+                detail=(f"Unknown named reaction '{req.named}'. See GET /react/named."),
+            )
+        smarts = NAMED_REACTIONS[req.named]["smarts"]
+
+    result = run_reaction(smarts, req.substrates)
+    if result is None:
+        raise HTTPException(status_code=422, detail=f"Invalid SMARTS: '{smarts}'")
+    out = result.to_dict()
+    if req.named:
+        out["named"] = req.named
+    return out
+
+
+# ── Matched Molecular Pairs (MMP) ─────────────────────────────────────────────
+
+
+class MMPRequest(BaseModel):
+    smiles_list: list[str] = Field(..., max_length=MAX_BATCH_SIZE)
+    names: Optional[list[str]] = Field(
+        None,
+        description="Optional parallel list of names (same length as smiles_list)",
+    )
+    max_substituent_atoms: int = Field(
+        10,
+        ge=1,
+        le=30,
+        description="Discard cuts whose substituent has more heavy atoms than this.",
+    )
+    max_pairs: int = Field(500, ge=1, le=5000)
+
+
+@app.post("/mmp", tags=["Cheminformatics"])
+async def mmp_endpoint(req: MMPRequest):
+    """
+    Single-cut Matched Molecular Pairs analysis.
+
+    Fragment every non-ring acyclic single bond, group molecules by shared
+    "context" fragment, and emit all unordered pairs (A, B) with different
+    substituents. Returns the context, R_A, R_B, and Δheavy_atoms per pair.
+    """
+    if req.names is not None and len(req.names) != len(req.smiles_list):
+        raise HTTPException(
+            status_code=422,
+            detail="`names` must have the same length as `smiles_list`",
+        )
+    result = find_mmp(
+        req.smiles_list,
+        names=req.names,
+        max_substituent_atoms=req.max_substituent_atoms,
+        max_pairs=req.max_pairs,
+    )
     return result.to_dict()
 
 

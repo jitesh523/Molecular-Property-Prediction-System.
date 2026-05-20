@@ -2408,6 +2408,144 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 
+    // ── Reactions Tab ───────────────────────────────────────────────────────
+    const rxBtn = document.getElementById("rx-btn");
+    const rxNamed = document.getElementById("rx-named");
+    const rxSmarts = document.getElementById("rx-smarts");
+    const rxSubs = document.getElementById("rx-substrates");
+    const rxResults = document.getElementById("rx-results");
+
+    // Populate named-reaction dropdown lazily on first tab open
+    let rxNamedLoaded = false;
+    document.querySelector('[data-tab="reactions"]')?.addEventListener("click", async () => {
+        if (rxNamedLoaded || !rxNamed) return;
+        try {
+            const resp = await fetch("/react/named");
+            const data = await resp.json();
+            (data.reactions || []).forEach(r => {
+                const opt = document.createElement("option");
+                opt.value = r.name;
+                opt.textContent = `${r.name} — ${r.description}`;
+                rxNamed.appendChild(opt);
+            });
+            rxNamedLoaded = true;
+        } catch (e) { console.warn("named-reaction catalog failed:", e); }
+    });
+
+    if (rxBtn) {
+        rxBtn.addEventListener("click", async () => {
+            const named = rxNamed.value || null;
+            const smarts = rxSmarts.value.trim() || null;
+            if (!named && !smarts) { alert("Pick a named reaction or paste a SMARTS"); return; }
+
+            const tuples = rxSubs.value
+                .split("\n")
+                .map(s => s.trim())
+                .filter(Boolean)
+                .map(line => line.replace(/\t/g, " ").split(/\s+/).filter(Boolean));
+            if (tuples.length === 0) { alert("Enter at least one substrate tuple"); return; }
+
+            rxBtn.disabled = true;
+            rxBtn.textContent = "⏳ Running…";
+            rxResults.classList.add("hidden");
+
+            try {
+                const body = { substrates: tuples };
+                if (named) body.named = named;
+                if (smarts) body.smarts = smarts;
+                const resp = await fetch("/react", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(body)
+                });
+                const data = await resp.json();
+                if (!resp.ok) throw new Error(data.detail || "Reaction failed");
+
+                document.getElementById("rx-input").textContent = data.n_input_sets;
+                document.getElementById("rx-produced").textContent = data.n_product_sets;
+                document.getElementById("rx-unique").textContent = (data.unique_products || []).length;
+                const list = document.getElementById("rx-product-list");
+                list.innerHTML = "";
+                (data.unique_products || []).forEach(s => {
+                    const chip = document.createElement("span");
+                    chip.style.cssText = "font-family:monospace;font-size:0.8rem;padding:0.3rem 0.6rem;background:rgba(167,139,250,0.1);border:1px solid #a78bfa;border-radius:8px;color:#c4b5fd;";
+                    chip.textContent = s;
+                    list.appendChild(chip);
+                });
+                if ((data.unique_products || []).length === 0) {
+                    list.innerHTML = '<span style="color:var(--text-muted);">(no products — pattern did not match any substrate)</span>';
+                }
+                rxResults.classList.remove("hidden");
+            } catch (err) {
+                alert(err.message);
+            } finally {
+                rxBtn.disabled = false;
+                rxBtn.textContent = "⚗️ Run reaction";
+            }
+        });
+    }
+
+    // ── MMP Tab ─────────────────────────────────────────────────────────────
+    const mmpBtn = document.getElementById("mmp-btn");
+    const mmpSmiles = document.getElementById("mmp-smiles");
+    const mmpMaxSub = document.getElementById("mmp-max-sub");
+    const mmpMaxPairs = document.getElementById("mmp-max-pairs");
+    const mmpResults = document.getElementById("mmp-results");
+
+    if (mmpBtn) {
+        mmpBtn.addEventListener("click", async () => {
+            const lines = mmpSmiles.value.split("\n").map(s => s.trim()).filter(Boolean);
+            if (lines.length < 2) { alert("Enter at least 2 SMILES"); return; }
+
+            mmpBtn.disabled = true;
+            mmpBtn.textContent = "⏳ Searching…";
+            mmpResults.classList.add("hidden");
+
+            try {
+                const resp = await fetch("/mmp", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        smiles_list: lines,
+                        max_substituent_atoms: parseInt(mmpMaxSub.value) || 10,
+                        max_pairs: parseInt(mmpMaxPairs.value) || 200,
+                    })
+                });
+                const data = await resp.json();
+                if (!resp.ok) throw new Error(data.detail || "MMP failed");
+
+                document.getElementById("mmp-valid").textContent = data.n_valid;
+                document.getElementById("mmp-contexts").textContent = data.n_contexts;
+                document.getElementById("mmp-npairs").textContent = data.n_pairs;
+
+                const tbody = document.getElementById("mmp-tbody");
+                tbody.innerHTML = "";
+                (data.pairs || []).forEach((p, i) => {
+                    const delta = p.delta_heavy_atoms;
+                    const dColor = delta > 0 ? "#10b981" : (delta < 0 ? "#f87171" : "var(--text-muted)");
+                    const dArrow = delta > 0 ? "▲ " : (delta < 0 ? "▼ " : "");
+                    const tr = document.createElement("tr");
+                    tr.innerHTML = `
+                        <td style="color:var(--text-muted);">${i + 1}</td>
+                        <td style="font-family:monospace;font-size:0.78rem;word-break:break-all;">${p.smiles_a}</td>
+                        <td style="font-family:monospace;font-size:0.78rem;word-break:break-all;">${p.smiles_b}</td>
+                        <td style="font-family:monospace;font-size:0.78rem;color:var(--text-muted);word-break:break-all;">${p.context}</td>
+                        <td style="font-family:monospace;font-size:0.8rem;color:#fbbf24;">${p.r_a}</td>
+                        <td style="font-family:monospace;font-size:0.8rem;color:#a78bfa;">${p.r_b}</td>
+                        <td style="color:${dColor};font-weight:600;">${dArrow}${delta >= 0 ? "+" : ""}${delta}</td>`;
+                    tbody.appendChild(tr);
+                });
+
+                mmpResults.classList.remove("hidden");
+            } catch (err) {
+                alert(err.message);
+            } finally {
+                mmpBtn.disabled = false;
+                mmpBtn.textContent = "🔗 Find Pairs";
+            }
+        });
+    }
+
     // Enter key support
     smilesInput.addEventListener("keypress", (e) => { if (e.key === "Enter") predictBtn.click(); });
 });

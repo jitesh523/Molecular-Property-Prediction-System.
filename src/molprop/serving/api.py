@@ -49,6 +49,7 @@ from molprop.models.optimization import LatentOptimizer
 from molprop.models.pareto import ParetoOptimizer
 from molprop.models.vae import SMILESVAE
 from molprop.models.visualize_explanations import get_explanation_image
+from molprop.serving.cache import cached_json, endpoint_cache
 from molprop.serving.load_model import load_gnn_model
 from molprop.serving.vector_db import vector_store
 from molprop.storage.library import library
@@ -256,6 +257,19 @@ class ModelInfo(BaseModel):
 async def health():
     """Health check endpoint."""
     return {"status": "ok", "model_loaded": ml_models.get("model") is not None}
+
+
+@app.get("/cache/stats", tags=["System"])
+async def cache_stats():
+    """Return hit/miss statistics for the in-process endpoint cache."""
+    return endpoint_cache.stats()
+
+
+@app.post("/cache/clear", tags=["System"])
+async def cache_clear():
+    """Clear the in-process endpoint cache."""
+    endpoint_cache.clear()
+    return {"status": "cleared", "stats": endpoint_cache.stats()}
 
 
 @app.get("/version", tags=["System"])
@@ -1223,6 +1237,7 @@ class ScaffoldRequest(BaseModel):
 
 
 @app.post("/scaffold", tags=["Cheminformatics"])
+@cached_json(ttl_seconds=600)
 async def scaffold_analysis(req: ScaffoldRequest):
     """
     Compute Bemis–Murcko scaffold, generic Murcko, ring metrics,
@@ -1254,6 +1269,7 @@ class IsomerRequest(BaseModel):
 
 
 @app.post("/isomers", tags=["Cheminformatics"])
+@cached_json(ttl_seconds=600)
 async def isomer_enumeration(req: IsomerRequest):
     """
     Enumerate tautomers and stereoisomers for a molecule.
@@ -1404,6 +1420,7 @@ class StandardizeRequest(BaseModel):
 
 
 @app.post("/standardize", tags=["Cheminformatics"])
+@cached_json(ttl_seconds=600)
 async def standardize_endpoint(req: StandardizeRequest):
     """
     Run full standardisation on a SMILES and report what changed.
@@ -1605,6 +1622,7 @@ class FunctionalGroupRequest(BaseModel):
 
 
 @app.post("/functional_groups", tags=["Cheminformatics"])
+@cached_json(ttl_seconds=600)
 async def functional_groups(req: FunctionalGroupRequest):
     """
     Detect functional groups in a molecule via SMARTS matching.
@@ -1796,6 +1814,7 @@ class MCSRequest(BaseModel):
 
 
 @app.post("/mcs", tags=["Cheminformatics"])
+@cached_json(ttl_seconds=600)
 async def mcs_endpoint(req: MCSRequest):
     """
     Find the maximum common substructure between two molecules.
@@ -1824,6 +1843,7 @@ class RGroupRequest(BaseModel):
 
 
 @app.post("/rgroups", tags=["Cheminformatics"])
+@cached_json(ttl_seconds=600)
 async def rgroup_decomposition(req: RGroupRequest):
     """
     Decompose a series of analogues around a common core scaffold.
@@ -1918,6 +1938,7 @@ class MMPRequest(BaseModel):
 
 
 @app.post("/mmp", tags=["Cheminformatics"])
+@cached_json(ttl_seconds=600)
 async def mmp_endpoint(req: MMPRequest):
     """
     Single-cut Matched Molecular Pairs analysis.
@@ -1952,6 +1973,7 @@ class AlertsRequest(BaseModel):
 
 
 @app.post("/alerts", tags=["Cheminformatics"])
+@cached_json(ttl_seconds=600)
 async def structural_alerts(req: AlertsRequest):
     """
     Run RDKit's FilterCatalog against the molecule.
@@ -2004,6 +2026,79 @@ async def structural_alerts(req: AlertsRequest):
         "counts_by_catalog": counts,
         "is_clean": len(alerts) == 0,
         "alerts": alerts,
+    }
+
+
+# ── 2D Depiction (SVG) ────────────────────────────────────────────────────────
+
+
+class DepictRequest(BaseModel):
+    smiles: str = Field(..., max_length=MAX_SMILES_LEN)
+    width: int = Field(400, ge=50, le=2000)
+    height: int = Field(400, ge=50, le=2000)
+    highlight_atoms: Optional[list[int]] = Field(
+        None,
+        description="Optional 0-indexed atom indices to highlight.",
+    )
+    highlight_smarts: Optional[str] = Field(
+        None,
+        description="Optional SMARTS — every matching atom will be highlighted.",
+    )
+
+
+@app.post("/depict", tags=["Cheminformatics"])
+@cached_json(ttl_seconds=600)
+async def depict_endpoint(req: DepictRequest):
+    """
+    Render a 2D SVG depiction of a molecule.
+
+    Optional atom highlighting either by explicit indices (``highlight_atoms``)
+    or by SMARTS match (``highlight_smarts``). Returns the SVG as a string
+    plus the canonical SMILES that was rendered.
+    """
+    from rdkit import Chem
+    from rdkit.Chem import Draw
+    from rdkit.Chem.Draw import rdMolDraw2D
+
+    mol = Chem.MolFromSmiles(req.smiles)
+    if mol is None:
+        raise HTTPException(status_code=422, detail=f"Invalid SMILES: '{req.smiles}'")
+
+    # Build atom highlight list
+    highlights: list[int] = []
+    if req.highlight_atoms:
+        highlights.extend(i for i in req.highlight_atoms if 0 <= i < mol.GetNumAtoms())
+    if req.highlight_smarts:
+        patt = Chem.MolFromSmarts(req.highlight_smarts)
+        if patt is None:
+            raise HTTPException(
+                status_code=422,
+                detail=f"Invalid SMARTS: '{req.highlight_smarts}'",
+            )
+        for match in mol.GetSubstructMatches(patt):
+            highlights.extend(match)
+    highlights = sorted(set(highlights))
+
+    # Ensure 2D coordinates
+    if mol.GetNumConformers() == 0:
+        Draw.rdDepictor.Compute2DCoords(mol)
+
+    drawer = rdMolDraw2D.MolDraw2DSVG(req.width, req.height)
+    drawer.drawOptions().clearBackground = False
+    if highlights:
+        drawer.DrawMolecule(mol, highlightAtoms=highlights)
+    else:
+        drawer.DrawMolecule(mol)
+    drawer.FinishDrawing()
+    svg = drawer.GetDrawingText()
+
+    return {
+        "smiles": req.smiles,
+        "canonical": Chem.MolToSmiles(mol),
+        "width": req.width,
+        "height": req.height,
+        "highlighted_atoms": highlights,
+        "svg": svg,
     }
 
 

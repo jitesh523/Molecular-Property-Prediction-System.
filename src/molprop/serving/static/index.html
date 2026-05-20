@@ -73,6 +73,12 @@
             <button class="tab-btn" data-tab="rgroups">
                 <span class="tab-icon">🧩</span> R-Groups
             </button>
+            <button class="tab-btn" data-tab="reactions">
+                <span class="tab-icon">⚗️</span> Reactions
+            </button>
+            <button class="tab-btn" data-tab="mmp">
+                <span class="tab-icon">🔗</span> MMP
+            </button>
         </nav>
 
         <main>
@@ -1195,6 +1201,113 @@
                                     <tr><th>#</th><th>SMILES</th><th>Status</th><th id="rg-th-r">R-Groups</th></tr>
                                 </thead>
                                 <tbody id="rg-tbody"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ══════════════════════════════════════════════════════════════
+                 TAB 17 – REACTIONS
+            ══════════════════════════════════════════════════════════════ -->
+            <section id="tab-reactions" class="tab-panel hidden">
+                <div class="input-section glass-panel fade-in slide-up">
+                    <h2>⚗️ Reaction SMARTS</h2>
+                    <p class="section-desc">Apply a reaction SMARTS — or a named reaction from the built-in catalog — to a list of substrate tuples.</p>
+
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-top: 1rem; align-items: end;">
+                        <div>
+                            <label for="rx-named">Named reaction (optional)</label>
+                            <select id="rx-named" style="width:100%;">
+                                <option value="">— custom SMARTS below —</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label for="rx-smarts">Custom SMARTS</label>
+                            <input type="text" id="rx-smarts" placeholder="e.g. [C:1](=O)[OH].[NH2:2]>>[C:1](=O)[N:2]" style="width:100%; font-family:monospace;">
+                        </div>
+                    </div>
+                    <div style="margin-top:0.75rem;">
+                        <label for="rx-substrates">Substrate tuples — one per line, reactants separated by TAB or single space</label>
+                        <textarea id="rx-substrates" rows="6" placeholder="CC(=O)O&#9;NCC&#10;c1ccccc1C(=O)O&#9;NCC" style="width:100%; font-family:monospace; padding:0.5rem;"></textarea>
+                    </div>
+                    <button id="rx-btn" class="btn-primary" style="padding:0.6rem 1.5rem; margin-top:0.75rem;">⚗️ Run reaction</button>
+                </div>
+
+                <div id="rx-results" class="hidden slide-up" style="margin-top: 1rem;">
+                    <div class="glass-panel" style="padding: 1.25rem;">
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 1rem; text-align: center;">
+                            <div>
+                                <div style="font-size:0.75rem;color:var(--text-muted);text-transform:uppercase;">Input sets</div>
+                                <div id="rx-input" style="font-size:1.8rem;font-weight:700;">0</div>
+                            </div>
+                            <div>
+                                <div style="font-size:0.75rem;color:var(--text-muted);text-transform:uppercase;">Produced</div>
+                                <div id="rx-produced" style="font-size:1.8rem;font-weight:700;color:#10b981;">0</div>
+                            </div>
+                            <div>
+                                <div style="font-size:0.75rem;color:var(--text-muted);text-transform:uppercase;">Unique products</div>
+                                <div id="rx-unique" style="font-size:1.8rem;font-weight:700;color:var(--accent-color);">0</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="glass-panel" style="padding: 1.25rem; margin-top: 1rem;">
+                        <h3 style="margin-bottom: 0.5rem;">🧪 Unique products</h3>
+                        <div id="rx-product-list" style="display:flex;flex-wrap:wrap;gap:0.4rem;"></div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ══════════════════════════════════════════════════════════════
+                 TAB 18 – MATCHED MOLECULAR PAIRS (MMP)
+            ══════════════════════════════════════════════════════════════ -->
+            <section id="tab-mmp" class="tab-panel hidden">
+                <div class="input-section glass-panel fade-in slide-up">
+                    <h2>🔗 Matched Molecular Pairs</h2>
+                    <p class="section-desc">Single-cut MMP analysis — fragment every non-ring acyclic bond and surface every (A, B) pair that shares a common context with different substituents.</p>
+
+                    <div>
+                        <label for="mmp-smiles">Analogue SMILES (one per line)</label>
+                        <textarea id="mmp-smiles" rows="8" placeholder="c1ccc(O)cc1&#10;c1ccc(N)cc1&#10;c1ccc(C)cc1&#10;c1ccc(F)cc1" style="width:100%; font-family:monospace; padding:0.5rem;"></textarea>
+                    </div>
+                    <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(170px, 1fr));gap:0.75rem;margin-top:0.75rem;align-items:end;">
+                        <div>
+                            <label for="mmp-max-sub">Max substituent atoms</label>
+                            <input type="number" id="mmp-max-sub" value="10" min="1" max="30" style="width:100%;">
+                        </div>
+                        <div>
+                            <label for="mmp-max-pairs">Max pairs</label>
+                            <input type="number" id="mmp-max-pairs" value="200" min="1" max="5000" style="width:100%;">
+                        </div>
+                        <button id="mmp-btn" class="btn-primary" style="padding:0.6rem 1.5rem;">🔗 Find Pairs</button>
+                    </div>
+                </div>
+
+                <div id="mmp-results" class="hidden slide-up" style="margin-top: 1rem;">
+                    <div class="glass-panel" style="padding: 1.25rem;">
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 1rem; text-align: center;">
+                            <div>
+                                <div style="font-size:0.75rem;color:var(--text-muted);text-transform:uppercase;">Valid molecules</div>
+                                <div id="mmp-valid" style="font-size:1.8rem;font-weight:700;">0</div>
+                            </div>
+                            <div>
+                                <div style="font-size:0.75rem;color:var(--text-muted);text-transform:uppercase;">Shared contexts</div>
+                                <div id="mmp-contexts" style="font-size:1.8rem;font-weight:700;color:#a78bfa;">0</div>
+                            </div>
+                            <div>
+                                <div style="font-size:0.75rem;color:var(--text-muted);text-transform:uppercase;">Pairs</div>
+                                <div id="mmp-npairs" style="font-size:1.8rem;font-weight:700;color:var(--accent-color);">0</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="glass-panel" style="padding: 1.25rem; margin-top: 1rem;">
+                        <h3 style="margin-bottom: 0.5rem;">📋 Pairs</h3>
+                        <div style="overflow-x:auto;">
+                            <table class="compare-table">
+                                <thead>
+                                    <tr><th>#</th><th>A</th><th>B</th><th>Context</th><th>R<sub>A</sub></th><th>R<sub>B</sub></th><th>Δheavy</th></tr>
+                                </thead>
+                                <tbody id="mmp-tbody"></tbody>
                             </table>
                         </div>
                     </div>

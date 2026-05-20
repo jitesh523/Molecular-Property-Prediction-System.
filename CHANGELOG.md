@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.32.0] - 2026-05-20
+
+### Added — Reaction & MMP UI tabs, endpoint caching, more tests, 2D depiction
+
+- **🧪 v2.29.0 — Reactions & MMP UI tabs** — two new standalone tabs:
+  - **Reactions tab** wired to `POST /react`: dropdown auto-populated from `GET /react/named`, custom SMARTS box, multi-line substrate-tuples textarea, KPI cards (input sets / produced / unique), product chip cloud.
+  - **MMP tab** wired to `POST /mmp`: multi-line analogue input, configurable max-substituent-atoms and max-pairs caps, summary KPI cards (valid molecules / shared contexts / pairs), and a full pair table with R<sub>A</sub>, R<sub>B</sub>, and colour-coded Δheavy.
+- **⚡ v2.30.0 — In-process TTL+LRU cache** (`src/molprop/serving/cache.py`)
+  - Thread-safe LRU+TTL cache with hit/miss accounting.
+  - `@cached_json(ttl_seconds=600)` decorator inspects Pydantic request models and uses a `sha256` JSON hash as the cache key.
+  - Applied to 8 stateless cheminformatics endpoints: `/scaffold`, `/isomers`, `/standardize`, `/functional_groups`, `/mcs`, `/rgroups`, `/mmp`, `/alerts`.
+  - New admin endpoints `GET /cache/stats` and `POST /cache/clear`.
+- **🧪 v2.31.0 — Tests for reactions, MMP, and cache** (`tests/test_reactions_mmp_cache.py`)
+  - 17 tests covering: amide coupling product correctness, N-methylation single-reactant case, named-catalog integrity, MMP pair finding on a phenol series, name-validation guards, LRU eviction, TTL expiry, cache-stats accounting, and bypass for non-serialisable arguments.
+- **🎨 v2.32.0 — 2D SVG depiction** — `POST /depict`:
+  - Renders a 2D SVG of any SMILES via `rdMolDraw2D.MolDraw2DSVG`.
+  - Optional atom highlighting either by explicit indices or by SMARTS match.
+  - Configurable width/height; result is cached via `@cached_json`.
+  - Exposed in the SDK (`client.depict`) and CLI (`molprop depict <smiles> -o file.svg`).
+
 ## [2.28.0] - 2026-05-20
 
 ### Added — R-group UI, reactions, examples, Matched Molecular Pairs

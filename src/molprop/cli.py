@@ -241,6 +241,43 @@ def mmp(ctx: click.Context, smiles_file: str, max_substituent_atoms: int, max_pa
 @cli.command()
 @click.argument("smiles")
 @click.option(
+    "-o",
+    "--output",
+    type=click.Path(),
+    default=None,
+    help="Write the SVG to this file instead of stdout.",
+)
+@click.option("--width", default=400, show_default=True)
+@click.option("--height", default=400, show_default=True)
+@click.option(
+    "--highlight-smarts",
+    default=None,
+    help="SMARTS pattern; every matching atom will be highlighted.",
+)
+@click.pass_context
+@_handle_errors
+def depict(
+    ctx: click.Context,
+    smiles: str,
+    output: Optional[str],
+    width: int,
+    height: int,
+    highlight_smarts: Optional[str],
+) -> None:
+    """Render a 2D SVG depiction of a molecule."""
+    data = _client(ctx).depict(
+        smiles, width=width, height=height, highlight_smarts=highlight_smarts
+    )
+    if output:
+        Path(output).write_text(data["svg"])
+        click.secho(f"Wrote SVG to {output}", fg="green")
+    else:
+        click.echo(data["svg"])
+
+
+@cli.command()
+@click.argument("smiles")
+@click.option(
     "--catalog",
     "catalogs",
     multiple=True,

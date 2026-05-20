@@ -246,6 +246,22 @@ class MolpropClient:
     def conformer(self, smiles: str) -> dict:
         return self._post("/conformer", {"smiles": smiles})
 
+    def depict(
+        self,
+        smiles: str,
+        width: int = 400,
+        height: int = 400,
+        highlight_atoms: Optional[list[int]] = None,
+        highlight_smarts: Optional[str] = None,
+    ) -> dict:
+        """Render a 2D SVG depiction of a molecule."""
+        body: dict[str, Any] = {"smiles": smiles, "width": width, "height": height}
+        if highlight_atoms is not None:
+            body["highlight_atoms"] = highlight_atoms
+        if highlight_smarts is not None:
+            body["highlight_smarts"] = highlight_smarts
+        return self._post("/depict", body)
+
     # ── similarity search ─────────────────────────────────────────────────────
     def search_similar(
         self,

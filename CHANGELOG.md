@@ -5,6 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.36.0] - 2026-05-21
+
+### Added — Live 2D depiction in Predict tab, rate limiting, browser SDK
+
+- **🎨 v2.33.0 — Live 2D depiction in Predict tab** — every successful prediction now auto-renders a 2D SVG of the standardized molecule beside the Inference Results panel:
+  - Server-cached via `@cached_json` (instant on second view).
+  - "💾 Download SVG" button saves a publication-ready SVG file named after the canonical SMILES.
+  - Reusable `renderDepiction(smiles, highlightSmarts?)` helper exposed for other tabs to call.
+- **🛡️ v2.34.0 — In-process token-bucket rate limiter** (`src/molprop/serving/rate_limit.py`)
+  - Per-IP `TokenBucket` with smooth refill — no extra dependencies.
+  - Configurable via env: `MOLPROP_RATE_LIMIT` (default 120), `MOLPROP_RATE_WINDOW` (default 60s), `MOLPROP_RATE_DISABLE`.
+  - Honours `X-Forwarded-For` for first-hop IP behind a reverse proxy.
+  - Exempts health/version/cache/openapi/docs paths so monitoring never trips the limit.
+  - Adds `X-RateLimit-Limit` / `X-RateLimit-Remaining` headers to every response, returns `429` + `Retry-After` on overflow.
+- **📘 v2.35.0 — Browser / TypeScript SDK** (`docs/BROWSER_SDK.md`)
+  - Single-file zero-dependency client (TS and JS variants, ≈80 lines each).
+  - Examples: drop-in `<script>` for plain HTML, Node 18+ / Deno / Bun ESM import, and a React `<MoleculePreview>` component that calls `/depict` as the user types.
+  - Documents `MolpropAPIError`, `429` rate-limit handling, and `X-RateLimit-*` headers.
+- **🧪 v2.36.0 — Rate-limit tests** (`tests/test_rate_limit.py`)
+  - 7 new tests: token-bucket capacity & refill semantics, `429` response shape, header propagation, exempt paths, and per-IP bucket segregation via `X-Forwarded-For`. **Total: 24 cheminformatics tests, all passing in 2.27s.**
+
 ## [2.32.0] - 2026-05-20
 
 ### Added — Reaction & MMP UI tabs, endpoint caching, more tests, 2D depiction

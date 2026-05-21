@@ -155,6 +155,17 @@
                         </div>
                     </div>
 
+                    <!-- 2D Depiction -->
+                    <div class="result-card glass-panel slide-up" id="depict-card" style="text-align:center;">
+                        <h3 class="section-title" style="text-align:left;">🎨 2D Depiction</h3>
+                        <div id="depict-svg" style="display:flex;justify-content:center;align-items:center;min-height:320px;padding:1rem;background:#ffffff;border-radius:12px;color:#555;">
+                            <span style="color:var(--text-muted);">Predict a molecule to see its 2D structure.</span>
+                        </div>
+                        <div style="margin-top:0.6rem;display:flex;gap:0.5rem;justify-content:center;flex-wrap:wrap;">
+                            <button id="depict-download" class="btn-secondary" style="padding:0.35rem 0.8rem;font-size:0.78rem;" disabled>💾 Download SVG</button>
+                        </div>
+                    </div>
+
                     <!-- Structural Evidence -->
                     <div class="explanation-card glass-panel hidden slide-up" id="explanation-panel">
                         <h3 class="section-title">Structural Evidence (GNNExplainer)</h3>

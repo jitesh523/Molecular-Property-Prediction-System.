@@ -169,6 +169,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Token-bucket rate limiter (configurable via MOLPROP_RATE_LIMIT / _WINDOW env vars)
+from molprop.serving.rate_limit import install_rate_limit  # noqa: E402
+
+install_rate_limit(app)
+
 
 # ── Timing Middleware ─────────────────────────────────────────────────────────
 

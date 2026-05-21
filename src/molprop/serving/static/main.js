@@ -14,6 +14,46 @@ document.addEventListener("DOMContentLoaded", () => {
     const predUncertainty = document.getElementById("pred-uncertainty");
     const stdSmilesDisplay = document.getElementById("std-smiles-display");
     const svgContainer = document.getElementById("svg-container");
+    const depictSvg = document.getElementById("depict-svg");
+    const depictDownload = document.getElementById("depict-download");
+    let lastDepictSvg = "";
+    let lastDepictSmiles = "";
+
+    async function renderDepiction(smiles, highlightSmarts = null) {
+        if (!depictSvg || !smiles) return;
+        try {
+            depictSvg.innerHTML = '<span style="color:#666;">⏳ Rendering…</span>';
+            const body = { smiles, width: 420, height: 320 };
+            if (highlightSmarts) body.highlight_smarts = highlightSmarts;
+            const resp = await fetch("/depict", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(body)
+            });
+            if (!resp.ok) throw new Error("depict failed");
+            const data = await resp.json();
+            depictSvg.innerHTML = data.svg;
+            lastDepictSvg = data.svg;
+            lastDepictSmiles = data.canonical || smiles;
+            if (depictDownload) depictDownload.disabled = false;
+        } catch (e) {
+            depictSvg.innerHTML = '<span style="color:#a00;">2D depiction failed.</span>';
+            console.warn("depict failed:", e);
+        }
+    }
+
+    if (depictDownload) {
+        depictDownload.addEventListener("click", () => {
+            if (!lastDepictSvg) return;
+            const blob = new Blob([lastDepictSvg], { type: "image/svg+xml" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = `${(lastDepictSmiles || "molecule").replace(/[^a-zA-Z0-9]/g, "_")}.svg`;
+            a.click();
+            URL.revokeObjectURL(url);
+        });
+    }
     const explanationPanel = document.getElementById("explanation-panel");
     const taskLabel = document.getElementById("task-label");
     const similarityPanel = document.getElementById("similarity-panel");
@@ -483,6 +523,9 @@ document.addEventListener("DOMContentLoaded", () => {
             // Track SMILES and show Find Analogs button
             lastPredictedSmiles = data.standardized_smiles || smilesInput.value;
             if (findAnalogsBtn) findAnalogsBtn.style.display = "inline-block";
+
+            // 2D Depiction (fire-and-forget, cached server-side)
+            renderDepiction(lastPredictedSmiles);
 
             // Save to history
             addToHistory({

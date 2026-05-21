@@ -217,6 +217,24 @@ class MolpropClient:
         """Return the catalog of built-in named reactions."""
         return self._get("/react/named")
 
+    def free_wilson(
+        self,
+        core: str,
+        smiles_list: list[str],
+        activities: list[float],
+        min_occurrences: int = 1,
+    ) -> dict:
+        """Free-Wilson additive R-group SAR analysis."""
+        return self._post(
+            "/freewilson",
+            {
+                "core": core,
+                "smiles_list": smiles_list,
+                "activities": activities,
+                "min_occurrences": min_occurrences,
+            },
+        )
+
     def mmp(
         self,
         smiles_list: list[str],

@@ -5,6 +5,28 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.40.0] - 2026-05-21
+
+### Added — Depict tab, Prometheus metrics, Free-Wilson SAR
+
+- **🎨 v2.37.0 — Standalone Depict UI tab** — fully-featured 2D rendering tab:
+  - SMILES + optional highlight-SMARTS inputs, configurable width/height.
+  - Live KPI showing the canonical SMILES the server rendered + count of highlighted atoms.
+  - "💾 Download SVG" button saves a publication-ready vector file.
+- **📊 v2.38.0 — Prometheus metrics endpoint** — `GET /metrics/prometheus`:
+  - Standard text exposition format (`version=0.0.4`) consumable by Prometheus / Grafana Agent / VictoriaMetrics.
+  - Emits `molprop_uptime_seconds`, `molprop_requests_total{route=…}`, `molprop_request_errors_total{route=…}`, `molprop_request_latency_seconds_sum{route=…}`, plus `molprop_cache_{hits,misses,size}` from the in-process endpoint cache.
+  - Path is exempt from the rate limiter so scrapers never trip a 429.
+- **📐 v2.39.0 — Free-Wilson SAR analysis** — new `POST /freewilson` backed by `src/molprop/features/freewilson.py`:
+  - Decomposes a series of analogues around a common core, fits a least-squares additive model where each R-group occupant becomes a one-hot feature.
+  - Returns intercept, R², RMSE, per-occupant additive contributions, and per-molecule observed/predicted/residual values.
+  - Uses the Moore–Penrose pseudo-inverse so it handles rank-deficient designs (small or sparse series).
+  - Numpy-only — zero new dependencies.
+- **🧪 v2.40.0 — Free-Wilson SDK + CLI + tests** —
+  - `client.free_wilson(core, smiles_list, activities, min_occurrences=…)` SDK helper.
+  - `molprop freewilson --core <smarts> data.tsv` CLI command (TAB or comma-separated SMILES + activity).
+  - 6 new tests covering invalid-core handling, length validation, perfect additive recovery (R²≈1, RMSE≈0), `min_occurrences` filtering, and the Prometheus exposition format. **30 cheminformatics tests passing in 7.9s.**
+
 ## [2.36.0] - 2026-05-21
 
 ### Added — Live 2D depiction in Predict tab, rate limiting, browser SDK

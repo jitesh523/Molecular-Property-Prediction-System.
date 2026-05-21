@@ -30,6 +30,8 @@ EXEMPT_PATHS = {
     "/health",
     "/version",
     "/cache/stats",
+    "/metrics",
+    "/metrics/prometheus",
     "/openapi.json",
     "/docs",
     "/redoc",

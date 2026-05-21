@@ -18,7 +18,7 @@ from typing import List, Optional
 
 import pandas as pd
 import torch
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
@@ -35,6 +35,7 @@ from molprop.features.admet import compute_admet
 from molprop.features.conformers import generate_3d_conformer, mol_to_pdb
 from molprop.features.descriptors import get_descriptor_names, smiles_to_descriptors
 from molprop.features.fingerprints import smiles_to_maccs, tanimoto_similarity
+from molprop.features.freewilson import free_wilson
 from molprop.features.functional_groups import detect_functional_groups
 from molprop.features.graphs import smiles_to_graph
 from molprop.features.isomers import enumerate_isomers
@@ -313,6 +314,68 @@ async def metrics():
         "uptime_s": round(time.time() - started, 3),
         "routes": per_route,
     }
+
+
+def _prom_label_escape(s: str) -> str:
+    """Escape a Prometheus label value (backslash, newline, quote)."""
+    return s.replace("\\", "\\\\").replace("\n", "\\n").replace('"', '\\"')
+
+
+@app.get("/metrics/prometheus", tags=["System"])
+async def metrics_prometheus():
+    """
+    Prometheus text-exposition format for scraping by Prometheus / Grafana
+    Agent / VictoriaMetrics. Emits five metrics:
+
+    * ``molprop_uptime_seconds`` (gauge)
+    * ``molprop_requests_total{route="…"}`` (counter)
+    * ``molprop_request_errors_total{route="…"}`` (counter)
+    * ``molprop_request_latency_seconds_sum{route="…"}`` (counter)
+    * ``molprop_cache_*`` (gauges from the in-process endpoint cache)
+    """
+    with _metrics_lock:
+        totals = dict(_metrics["requests_total"])
+        errors = dict(_metrics["requests_errors"])
+        latency_sum = dict(_metrics["latency_sum_s"])
+        started = _metrics["started_at"]
+
+    cache = endpoint_cache.stats()
+    uptime = time.time() - started
+    lines: list[str] = []
+
+    lines.append("# HELP molprop_uptime_seconds Process uptime in seconds.")
+    lines.append("# TYPE molprop_uptime_seconds gauge")
+    lines.append(f"molprop_uptime_seconds {uptime:.6f}")
+
+    lines.append("# HELP molprop_requests_total Total number of HTTP requests.")
+    lines.append("# TYPE molprop_requests_total counter")
+    for route, n in totals.items():
+        lines.append(f'molprop_requests_total{{route="{_prom_label_escape(route)}"}} {n}')
+
+    lines.append("# HELP molprop_request_errors_total Total HTTP error responses (>=400).")
+    lines.append("# TYPE molprop_request_errors_total counter")
+    for route, n in errors.items():
+        lines.append(f'molprop_request_errors_total{{route="{_prom_label_escape(route)}"}} {n}')
+
+    lines.append("# HELP molprop_request_latency_seconds_sum Total request latency seconds.")
+    lines.append("# TYPE molprop_request_latency_seconds_sum counter")
+    for route, s in latency_sum.items():
+        lines.append(
+            f'molprop_request_latency_seconds_sum{{route="{_prom_label_escape(route)}"}} {s:.6f}'
+        )
+
+    lines.append("# HELP molprop_cache_hits_total Endpoint-cache hits.")
+    lines.append("# TYPE molprop_cache_hits_total counter")
+    lines.append(f"molprop_cache_hits_total {cache['hits']}")
+    lines.append("# HELP molprop_cache_misses_total Endpoint-cache misses.")
+    lines.append("# TYPE molprop_cache_misses_total counter")
+    lines.append(f"molprop_cache_misses_total {cache['misses']}")
+    lines.append("# HELP molprop_cache_size Current number of cache entries.")
+    lines.append("# TYPE molprop_cache_size gauge")
+    lines.append(f"molprop_cache_size {cache['size']}")
+
+    body = "\n".join(lines) + "\n"
+    return Response(content=body, media_type="text/plain; version=0.0.4")
 
 
 @app.get("/model/info", response_model=ModelInfo, tags=["System"])
@@ -1963,6 +2026,52 @@ async def mmp_endpoint(req: MMPRequest):
         max_substituent_atoms=req.max_substituent_atoms,
         max_pairs=req.max_pairs,
     )
+    return result.to_dict()
+
+
+# ── Free-Wilson SAR analysis ──────────────────────────────────────────────────
+
+
+class FreeWilsonRequest(BaseModel):
+    core: str = Field(..., max_length=500, description="Core scaffold (SMARTS or SMILES)")
+    smiles_list: list[str] = Field(..., max_length=MAX_BATCH_SIZE)
+    activities: list[float] = Field(
+        ...,
+        max_length=MAX_BATCH_SIZE,
+        description="Measured property values (e.g. pIC50). Same length as smiles_list.",
+    )
+    min_occurrences: int = Field(
+        1,
+        ge=1,
+        le=100,
+        description="Discard R-group occupants seen in fewer than N analogues.",
+    )
+
+
+@app.post("/freewilson", tags=["Cheminformatics"])
+@cached_json(ttl_seconds=600)
+async def freewilson_endpoint(req: FreeWilsonRequest):
+    """
+    Free-Wilson additive R-group SAR analysis.
+
+    Decomposes ``smiles_list`` around ``core``, then fits a least-squares
+    linear model where each R-group occupant becomes a one-hot feature.
+    Returns the intercept, R², RMSE, per-occupant additive contributions,
+    and per-molecule observed/predicted/residual values.
+    """
+    if len(req.activities) != len(req.smiles_list):
+        raise HTTPException(
+            status_code=422,
+            detail="`activities` must be the same length as `smiles_list`",
+        )
+    result = free_wilson(
+        req.core,
+        req.smiles_list,
+        req.activities,
+        min_occurrences=req.min_occurrences,
+    )
+    if result is None:
+        raise HTTPException(status_code=422, detail=f"Invalid core: '{req.core}'")
     return result.to_dict()
 
 

@@ -211,6 +211,48 @@ def react_list(ctx: click.Context) -> None:
     _emit(ctx, _client(ctx).react_named())
 
 
+@cli.command(name="freewilson")
+@click.option("--core", required=True, help="Core scaffold SMARTS or SMILES.")
+@click.argument("data_file", type=click.Path(exists=True))
+@click.option(
+    "--min-occurrences",
+    default=1,
+    show_default=True,
+    help="Drop R-group occupants seen in fewer than N analogues.",
+)
+@click.pass_context
+@_handle_errors
+def freewilson(ctx: click.Context, core: str, data_file: str, min_occurrences: int) -> None:
+    """
+    Free-Wilson additive R-group SAR analysis.
+
+    DATA_FILE is a TAB- or comma-separated file with two columns:
+    SMILES and the measured activity (e.g. pIC50). Header optional.
+    """
+    smiles_list: list[str] = []
+    activities: list[float] = []
+    for line in Path(data_file).read_text().splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        # split on tab or comma; take first two non-empty parts
+        parts = [p for p in line.replace("\t", ",").split(",") if p.strip()]
+        if len(parts) < 2:
+            continue
+        try:
+            activities.append(float(parts[1]))
+        except ValueError:
+            # likely a header row — skip
+            continue
+        smiles_list.append(parts[0].strip())
+    if not smiles_list:
+        raise click.ClickException("No (SMILES, activity) rows found in data file.")
+    _emit(
+        ctx,
+        _client(ctx).free_wilson(core, smiles_list, activities, min_occurrences=min_occurrences),
+    )
+
+
 @cli.command()
 @click.argument("smiles_file", type=click.Path(exists=True))
 @click.option(

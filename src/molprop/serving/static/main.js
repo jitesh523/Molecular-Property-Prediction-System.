@@ -2589,6 +2589,74 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 
+    // ── Depict Tab ──────────────────────────────────────────────────────────
+    const dpBtn = document.getElementById("dp-btn");
+    const dpDl = document.getElementById("dp-dl");
+    const dpSmilesInp = document.getElementById("dp-smiles");
+    const dpSmartsInp = document.getElementById("dp-smarts");
+    const dpWidth = document.getElementById("dp-width");
+    const dpHeight = document.getElementById("dp-height");
+    const dpResults = document.getElementById("dp-results");
+    const dpSvg = document.getElementById("dp-svg");
+    const dpCanonical = document.getElementById("dp-canonical");
+    const dpNatoms = document.getElementById("dp-natoms");
+    let lastTabSvg = "";
+    let lastTabSmiles = "";
+
+    if (dpBtn) {
+        dpBtn.addEventListener("click", async () => {
+            const smiles = dpSmilesInp.value.trim();
+            if (!smiles) { alert("Enter a SMILES"); return; }
+            const smarts = dpSmartsInp.value.trim() || null;
+
+            dpBtn.disabled = true;
+            dpBtn.textContent = "⏳ Rendering…";
+            dpResults.classList.add("hidden");
+
+            try {
+                const body = {
+                    smiles,
+                    width: parseInt(dpWidth.value) || 500,
+                    height: parseInt(dpHeight.value) || 400,
+                };
+                if (smarts) body.highlight_smarts = smarts;
+                const resp = await fetch("/depict", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(body)
+                });
+                const data = await resp.json();
+                if (!resp.ok) throw new Error(data.detail || "Depict failed");
+
+                dpCanonical.textContent = data.canonical;
+                dpNatoms.textContent = (data.highlighted_atoms || []).length;
+                dpSvg.innerHTML = data.svg;
+                lastTabSvg = data.svg;
+                lastTabSmiles = data.canonical;
+                dpDl.disabled = false;
+                dpResults.classList.remove("hidden");
+            } catch (err) {
+                alert(err.message);
+            } finally {
+                dpBtn.disabled = false;
+                dpBtn.textContent = "🎨 Render";
+            }
+        });
+    }
+
+    if (dpDl) {
+        dpDl.addEventListener("click", () => {
+            if (!lastTabSvg) return;
+            const blob = new Blob([lastTabSvg], { type: "image/svg+xml" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = `${(lastTabSmiles || "molecule").replace(/[^a-zA-Z0-9]/g, "_")}.svg`;
+            a.click();
+            URL.revokeObjectURL(url);
+        });
+    }
+
     // Enter key support
     smilesInput.addEventListener("keypress", (e) => { if (e.key === "Enter") predictBtn.click(); });
 });

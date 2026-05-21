@@ -79,6 +79,9 @@
             <button class="tab-btn" data-tab="mmp">
                 <span class="tab-icon">🔗</span> MMP
             </button>
+            <button class="tab-btn" data-tab="depict">
+                <span class="tab-icon">🎨</span> Depict
+            </button>
         </nav>
 
         <main>
@@ -1321,6 +1324,55 @@
                                 <tbody id="mmp-tbody"></tbody>
                             </table>
                         </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ══════════════════════════════════════════════════════════════
+                 TAB 19 – DEPICT (2D SVG with highlights)
+            ══════════════════════════════════════════════════════════════ -->
+            <section id="tab-depict" class="tab-panel hidden">
+                <div class="input-section glass-panel fade-in slide-up">
+                    <h2>🎨 2D Depiction with Highlighting</h2>
+                    <p class="section-desc">Render any molecule and optionally highlight a SMARTS substructure.</p>
+
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;margin-top:0.75rem;">
+                        <div>
+                            <label for="dp-smiles">SMILES</label>
+                            <input type="text" id="dp-smiles" placeholder="CC(=O)Oc1ccccc1C(=O)O" style="width:100%;font-family:monospace;">
+                        </div>
+                        <div>
+                            <label for="dp-smarts">Highlight SMARTS (optional)</label>
+                            <input type="text" id="dp-smarts" placeholder="C(=O)O" style="width:100%;font-family:monospace;">
+                        </div>
+                    </div>
+                    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:0.75rem;margin-top:0.75rem;align-items:end;">
+                        <div>
+                            <label for="dp-width">Width</label>
+                            <input type="number" id="dp-width" value="500" min="50" max="2000" style="width:100%;">
+                        </div>
+                        <div>
+                            <label for="dp-height">Height</label>
+                            <input type="number" id="dp-height" value="400" min="50" max="2000" style="width:100%;">
+                        </div>
+                        <button id="dp-btn" class="btn-primary" style="padding:0.6rem 1.5rem;">🎨 Render</button>
+                        <button id="dp-dl" class="btn-secondary" style="padding:0.6rem 1rem;" disabled>💾 Download SVG</button>
+                    </div>
+                </div>
+
+                <div id="dp-results" class="hidden slide-up" style="margin-top:1rem;">
+                    <div class="glass-panel" style="padding:1.25rem;">
+                        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:0.75rem;text-align:center;margin-bottom:1rem;">
+                            <div>
+                                <div style="font-size:0.75rem;color:var(--text-muted);text-transform:uppercase;">Canonical SMILES</div>
+                                <div id="dp-canonical" style="font-family:monospace;font-size:0.9rem;word-break:break-all;"></div>
+                            </div>
+                            <div>
+                                <div style="font-size:0.75rem;color:var(--text-muted);text-transform:uppercase;">Highlighted atoms</div>
+                                <div id="dp-natoms" style="font-size:1.5rem;font-weight:700;color:#fbbf24;">0</div>
+                            </div>
+                        </div>
+                        <div id="dp-svg" style="display:flex;justify-content:center;align-items:center;min-height:300px;background:#fff;border-radius:12px;padding:1rem;"></div>
                     </div>
                 </div>
             </section>

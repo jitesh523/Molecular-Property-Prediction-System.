@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.45.0] - 2026-05-22
+
+### Added — MaxMin diverse-subset selection
+
+- **🎯 `POST /diversity/select`** backed by `src/molprop/features/diversity.py`:
+  - Greedy MaxMin (farthest-first) traversal — repeatedly picks the molecule whose minimum distance to the already-picked set is maximised.
+  - Distance = `1 − Tanimoto(Morgan or MACCS)`; configurable fingerprint, radius, n_bits, and explicit seed index.
+  - Returns picked indices + canonical SMILES + the min-distance frontier — strictly better than random sampling for SAR coverage.
+- SDK helper `client.diversity_select(smiles_list, n_pick, method=…, seed_index=…)`.
+- **🧪 8 new tests** — n_pick clamping, default + explicit seeds, uniqueness of picks, invalid-SMILES skipping, MaxMin's monotonic-frontier invariant, endpoint round-trip + over-large `n_pick` handling.
+
 ## [2.44.0] - 2026-05-22
 
 ### Added — N×N Tanimoto similarity matrix

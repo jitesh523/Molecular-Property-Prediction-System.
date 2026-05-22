@@ -34,6 +34,7 @@ from molprop.data.standardize import (
 from molprop.features.admet import compute_admet
 from molprop.features.conformers import generate_3d_conformer, mol_to_pdb
 from molprop.features.descriptors import get_descriptor_names, smiles_to_descriptors
+from molprop.features.diversity import maxmin_select
 from molprop.features.fingerprints import smiles_to_maccs, tanimoto_similarity
 from molprop.features.freewilson import free_wilson
 from molprop.features.functional_groups import detect_functional_groups
@@ -1696,6 +1697,41 @@ async def similarity_matrix(req: SimilarityMatrixRequest):
         "matrix": [[round(float(x), 6) for x in row] for row in matrix],
         "nearest_neighbours": nn_pairs,
     }
+
+
+class DiversitySelectRequest(BaseModel):
+    smiles_list: list[str] = Field(..., min_length=2, max_length=MAX_BATCH_SIZE)
+    n_pick: int = Field(..., ge=1, le=MAX_BATCH_SIZE)
+    method: str = Field("morgan", pattern="^(morgan|maccs)$")
+    radius: int = Field(2, ge=1, le=4)
+    n_bits: int = Field(2048, ge=128, le=8192)
+    seed_index: Optional[int] = Field(
+        None,
+        description="Index of the initial pick. Defaults to first valid SMILES.",
+    )
+
+
+@app.post("/diversity/select", tags=["Cheminformatics"])
+@cached_json(ttl_seconds=600)
+async def diversity_select(req: DiversitySelectRequest):
+    """
+    Greedy MaxMin diverse-subset picker (a.k.a. farthest-first traversal).
+
+    Starting from a seed molecule, repeatedly pick the molecule whose minimum
+    distance (= 1 − Tanimoto) to the already-picked set is maximised. This is
+    the canonical algorithm for selecting diverse screening subsets or
+    training-set splits — strictly better than random sampling for SAR
+    coverage.
+    """
+    result = maxmin_select(
+        req.smiles_list,
+        n_pick=req.n_pick,
+        method=req.method,
+        radius=req.radius,
+        n_bits=req.n_bits,
+        seed_index=req.seed_index,
+    )
+    return result.to_dict()
 
 
 # ── Aggregated Markdown Report ────────────────────────────────────────────────

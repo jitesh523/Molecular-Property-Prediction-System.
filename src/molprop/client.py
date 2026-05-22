@@ -299,6 +299,27 @@ class MolpropClient:
             },
         )
 
+    def diversity_select(
+        self,
+        smiles_list: list[str],
+        n_pick: int,
+        method: str = "morgan",
+        radius: int = 2,
+        n_bits: int = 2048,
+        seed_index: Optional[int] = None,
+    ) -> dict:
+        """Greedy MaxMin (farthest-first) diverse-subset picker."""
+        body: dict[str, Any] = {
+            "smiles_list": smiles_list,
+            "n_pick": n_pick,
+            "method": method,
+            "radius": radius,
+            "n_bits": n_bits,
+        }
+        if seed_index is not None:
+            body["seed_index"] = seed_index
+        return self._post("/diversity/select", body)
+
     def conformer(self, smiles: str) -> dict:
         return self._post("/conformer", {"smiles": smiles})
 

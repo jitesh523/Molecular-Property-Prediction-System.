@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.43.0] - 2026-05-22
+
+### Added — Batch SMILES standardization
+
+- **🧹 `POST /standardize/batch`** — curate untrusted SMILES datasets at scale:
+  - Per-row `{input, final, changed, valid}` plus aggregate `n_valid / n_invalid / n_changed` counters.
+  - Invalid SMILES are flagged with `valid=false` rather than aborting the whole batch — critical for cleaning user-supplied data.
+  - Cached via `@cached_json` so repeated curation requests are near-instant.
+- SDK helper `client.standardize_batch(smiles_list)`.
+- **🧪 4 new tests** — round-trip validation, invalid-row reporting, change detection, empty-list rejection.
+
 ## [2.42.0] - 2026-05-22
 
 ### Added — Bemis–Murcko scaffold clustering

@@ -1571,6 +1571,45 @@ async def standardize_endpoint(req: StandardizeRequest):
     }
 
 
+class StandardizeBatchRequest(BaseModel):
+    smiles_list: list[str] = Field(..., min_length=1, max_length=MAX_BATCH_SIZE)
+
+
+@app.post("/standardize/batch", tags=["Cheminformatics"])
+@cached_json(ttl_seconds=600)
+async def standardize_batch(req: StandardizeBatchRequest):
+    """
+    Standardize a batch of SMILES. Returns per-input rows
+    ``{input, final, changed, valid}`` plus aggregate counts. Invalid inputs are
+    reported with ``valid=false`` rather than raising — useful when curating
+    untrusted user-supplied datasets.
+    """
+    from rdkit import Chem
+
+    rows = []
+    n_changed = 0
+    n_valid = 0
+    for smi in req.smiles_list:
+        mol = Chem.MolFromSmiles(smi)
+        if mol is None:
+            rows.append({"input": smi, "final": None, "changed": False, "valid": False})
+            continue
+        n_valid += 1
+        final = standardize_smiles(smi)
+        changed = final != smi
+        if changed:
+            n_changed += 1
+        rows.append({"input": smi, "final": final, "changed": changed, "valid": True})
+
+    return {
+        "n_input": len(req.smiles_list),
+        "n_valid": n_valid,
+        "n_invalid": len(req.smiles_list) - n_valid,
+        "n_changed": n_changed,
+        "rows": rows,
+    }
+
+
 # ── Aggregated Markdown Report ────────────────────────────────────────────────
 
 

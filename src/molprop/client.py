@@ -277,6 +277,10 @@ class MolpropClient:
     def standardize(self, smiles: str) -> dict:
         return self._post("/standardize", {"smiles": smiles})
 
+    def standardize_batch(self, smiles_list: list[str]) -> dict:
+        """Standardize a batch of SMILES, returning per-input rows + counts."""
+        return self._post("/standardize/batch", {"smiles_list": smiles_list})
+
     def conformer(self, smiles: str) -> dict:
         return self._post("/conformer", {"smiles": smiles})
 

@@ -43,6 +43,7 @@ from molprop.features.mcs import find_mcs
 from molprop.features.mmp import find_mmp
 from molprop.features.reactions import NAMED_REACTIONS, list_named_reactions, run_reaction
 from molprop.features.rgroups import decompose_rgroups
+from molprop.features.scaffold_cluster import cluster_by_scaffold
 from molprop.features.scaffolds import analyze_scaffold
 from molprop.features.substructure import substructure_search
 from molprop.models.explain import explain_graph, get_explainer
@@ -1314,6 +1315,33 @@ async def scaffold_analysis(req: ScaffoldRequest):
     result = analyze_scaffold(req.smiles)
     if result is None:
         raise HTTPException(status_code=422, detail=f"Invalid SMILES: '{req.smiles}'")
+    return result.to_dict()
+
+
+class ScaffoldClusterRequest(BaseModel):
+    smiles_list: list[str] = Field(..., min_length=1, max_length=MAX_BATCH_SIZE)
+    generic: bool = Field(
+        False,
+        description="If true, collapse atoms→C and bonds→single (generic Murcko framework).",
+    )
+    min_cluster_size: int = Field(1, ge=1, le=1000)
+
+
+@app.post("/scaffold/cluster", tags=["Cheminformatics"])
+@cached_json(ttl_seconds=600)
+async def scaffold_cluster_endpoint(req: ScaffoldClusterRequest):
+    """
+    Group a list of SMILES by their Bemis–Murcko scaffold.
+
+    Optionally use the **generic Murcko framework** (every atom→C, every bond→single)
+    to cluster isosteres / bioisosteres together. Clusters are returned sorted by
+    descending size, then by scaffold SMILES (deterministic).
+    """
+    result = cluster_by_scaffold(
+        req.smiles_list,
+        generic=req.generic,
+        min_cluster_size=req.min_cluster_size,
+    )
     return result.to_dict()
 
 

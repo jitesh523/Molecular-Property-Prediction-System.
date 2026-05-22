@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.42.0] - 2026-05-22
+
+### Added — Bemis–Murcko scaffold clustering
+
+- **🌳 `POST /scaffold/cluster`** backed by `src/molprop/features/scaffold_cluster.py`:
+  - Groups a list of SMILES by their Bemis–Murcko scaffold.
+  - `generic=true` collapses atoms→C and bonds→single (generic Murcko framework), useful for grouping isosteres / bioisosteres (e.g. pyridine ≡ benzene).
+  - `min_cluster_size` filter for dropping singleton scaffolds.
+  - Clusters are deterministically sorted by descending size.
+- **🧪 8 new tests** covering empty input, benzene-analogue collapse, invalid-SMILES handling, generic-framework isostere merging, size-filter, deterministic ordering, and the endpoint round-trip.
+- SDK helper `client.scaffold_cluster(smiles_list, generic=…, min_cluster_size=…)`.
+
 ## [2.41.0] - 2026-05-22
 
 ### Added — Free-Wilson SAR UI tab

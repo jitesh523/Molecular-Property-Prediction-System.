@@ -217,6 +217,22 @@ class MolpropClient:
         """Return the catalog of built-in named reactions."""
         return self._get("/react/named")
 
+    def scaffold_cluster(
+        self,
+        smiles_list: list[str],
+        generic: bool = False,
+        min_cluster_size: int = 1,
+    ) -> dict:
+        """Group SMILES by Bemis–Murcko scaffold (or generic framework)."""
+        return self._post(
+            "/scaffold/cluster",
+            {
+                "smiles_list": smiles_list,
+                "generic": generic,
+                "min_cluster_size": min_cluster_size,
+            },
+        )
+
     def free_wilson(
         self,
         core: str,

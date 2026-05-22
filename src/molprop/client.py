@@ -281,6 +281,24 @@ class MolpropClient:
         """Standardize a batch of SMILES, returning per-input rows + counts."""
         return self._post("/standardize/batch", {"smiles_list": smiles_list})
 
+    def similarity_matrix(
+        self,
+        smiles_list: list[str],
+        method: str = "morgan",
+        radius: int = 2,
+        n_bits: int = 2048,
+    ) -> dict:
+        """N×N Tanimoto similarity matrix + nearest-neighbour pairs."""
+        return self._post(
+            "/similarity/matrix",
+            {
+                "smiles_list": smiles_list,
+                "method": method,
+                "radius": radius,
+                "n_bits": n_bits,
+            },
+        )
+
     def conformer(self, smiles: str) -> dict:
         return self._post("/conformer", {"smiles": smiles})
 

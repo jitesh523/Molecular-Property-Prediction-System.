@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.44.0] - 2026-05-22
+
+### Added — N×N Tanimoto similarity matrix
+
+- **🧮 `POST /similarity/matrix`** — pairwise Tanimoto matrix for a SMILES list:
+  - Choice of fingerprint: `morgan` (ECFP4-style) with configurable `radius`/`n_bits`, or `maccs` (167-bit).
+  - Returns the dense N×N matrix, parallel canonical-SMILES + validity mask, and a list of nearest-neighbour pairs (`{i, j, similarity}`) — perfect for diversity analysis or driving a heatmap UI.
+  - Invalid SMILES → zero row/column rather than aborting.
+  - Capped at 200 inputs (= 20 000 pairs) for sane payloads; larger libraries should use the Qdrant vector store.
+- SDK helper `client.similarity_matrix(smiles_list, method=…, radius=…, n_bits=…)`.
+- **🧪 7 new tests** — matrix shape, unit diagonal, symmetry, similar-pair ordering, invalid-row zeroing, MACCS path, nearest-neighbour correctness.
+
 ## [2.43.0] - 2026-05-22
 
 ### Added — Batch SMILES standardization

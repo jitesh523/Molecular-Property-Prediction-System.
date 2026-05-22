@@ -1610,6 +1610,94 @@ async def standardize_batch(req: StandardizeBatchRequest):
     }
 
 
+class SimilarityMatrixRequest(BaseModel):
+    smiles_list: list[str] = Field(..., min_length=2, max_length=200)
+    method: str = Field(
+        "morgan",
+        pattern="^(morgan|maccs)$",
+        description="Fingerprint family: morgan (ECFP4) or maccs (167-bit).",
+    )
+    radius: int = Field(2, ge=1, le=4)
+    n_bits: int = Field(2048, ge=128, le=8192)
+
+
+@app.post("/similarity/matrix", tags=["Cheminformatics"])
+@cached_json(ttl_seconds=600)
+async def similarity_matrix(req: SimilarityMatrixRequest):
+    """
+    Compute an N×N Tanimoto-similarity matrix for a list of SMILES.
+
+    Uses Morgan (ECFP4-style) or MACCS fingerprints. Returns the dense
+    matrix as nested lists plus parallel lists of canonical SMILES and
+    a boolean validity mask. Invalid rows contribute zero similarity.
+
+    Capped at 200 inputs (=20 000 pairs) to keep response payload sane;
+    use the dedicated vector-DB for larger libraries.
+    """
+    import numpy as np
+    from rdkit import Chem
+    from rdkit.Chem import AllChem, MACCSkeys
+    from rdkit import DataStructs
+
+    fps: list = []
+    canonical: list[str] = []
+    valid: list[bool] = []
+    for smi in req.smiles_list:
+        mol = Chem.MolFromSmiles(smi)
+        if mol is None:
+            fps.append(None)
+            canonical.append(smi)
+            valid.append(False)
+            continue
+        canonical.append(Chem.MolToSmiles(mol))
+        valid.append(True)
+        if req.method == "morgan":
+            fps.append(
+                AllChem.GetMorganFingerprintAsBitVect(mol, req.radius, nBits=req.n_bits)
+            )
+        else:  # maccs
+            fps.append(MACCSkeys.GenMACCSKeys(mol))
+
+    n = len(fps)
+    matrix = np.zeros((n, n), dtype=float)
+    for i in range(n):
+        if fps[i] is None:
+            continue
+        matrix[i, i] = 1.0
+        for j in range(i + 1, n):
+            if fps[j] is None:
+                continue
+            sim = DataStructs.TanimotoSimilarity(fps[i], fps[j])
+            matrix[i, j] = sim
+            matrix[j, i] = sim
+
+    # Find nearest-neighbour for each row (excluding self), useful for diversity
+    nn_pairs = []
+    for i in range(n):
+        if not valid[i]:
+            continue
+        best_j = -1
+        best_s = -1.0
+        for j in range(n):
+            if j == i or not valid[j]:
+                continue
+            if matrix[i, j] > best_s:
+                best_s = float(matrix[i, j])
+                best_j = j
+        if best_j >= 0:
+            nn_pairs.append({"i": i, "j": best_j, "similarity": round(best_s, 6)})
+
+    return {
+        "n": n,
+        "n_valid": sum(1 for v in valid if v),
+        "method": req.method,
+        "smiles": canonical,
+        "valid": valid,
+        "matrix": [[round(float(x), 6) for x in row] for row in matrix],
+        "nearest_neighbours": nn_pairs,
+    }
+
+
 # ── Aggregated Markdown Report ────────────────────────────────────────────────
 
 

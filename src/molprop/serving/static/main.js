@@ -2657,6 +2657,97 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 
+    // ── Free-Wilson Tab ─────────────────────────────────────────────────────
+    const fwBtn = document.getElementById("fw-btn");
+    const fwCore = document.getElementById("fw-core");
+    const fwData = document.getElementById("fw-data");
+    const fwMinOcc = document.getElementById("fw-min-occ");
+    const fwResults = document.getElementById("fw-results");
+
+    if (fwBtn) {
+        fwBtn.addEventListener("click", async () => {
+            const core = fwCore.value.trim();
+            if (!core) { alert("Enter a core scaffold (SMARTS or SMILES)"); return; }
+
+            const smilesList = [];
+            const activities = [];
+            for (const raw of fwData.value.split("\n")) {
+                const line = raw.trim();
+                if (!line) continue;
+                const parts = line.replace(/\t/g, ",").split(",").map(s => s.trim()).filter(Boolean);
+                if (parts.length < 2) continue;
+                const y = parseFloat(parts[1]);
+                if (!Number.isFinite(y)) continue;
+                smilesList.push(parts[0]);
+                activities.push(y);
+            }
+            if (smilesList.length < 2) { alert("Need at least 2 valid (SMILES, activity) rows"); return; }
+
+            fwBtn.disabled = true;
+            fwBtn.textContent = "⏳ Fitting…";
+            fwResults.classList.add("hidden");
+
+            try {
+                const resp = await fetch("/freewilson", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        core,
+                        smiles_list: smilesList,
+                        activities,
+                        min_occurrences: parseInt(fwMinOcc.value) || 1,
+                    })
+                });
+                const data = await resp.json();
+                if (!resp.ok) throw new Error(data.detail || "Free-Wilson failed");
+
+                document.getElementById("fw-used").textContent = data.n_used;
+                document.getElementById("fw-intercept").textContent = data.intercept.toFixed(3);
+                document.getElementById("fw-r2").textContent = data.r_squared.toFixed(3);
+                document.getElementById("fw-rmse").textContent = data.rmse.toFixed(3);
+
+                const tbody = document.getElementById("fw-contribs-tbody");
+                tbody.innerHTML = "";
+                // Sort: largest |contribution| first, references (Δ=0, frequent) last
+                const sorted = [...(data.contributions || [])].sort(
+                    (a, b) => Math.abs(b.contribution) - Math.abs(a.contribution)
+                );
+                sorted.forEach(c => {
+                    const colour = c.contribution > 0 ? "#10b981" : (c.contribution < 0 ? "#f87171" : "var(--text-muted)");
+                    const arrow = c.contribution > 0 ? "▲ " : (c.contribution < 0 ? "▼ " : "· ");
+                    const tr = document.createElement("tr");
+                    tr.innerHTML = `
+                        <td style="font-family:monospace;color:#a78bfa;">${c.position}</td>
+                        <td style="font-family:monospace;font-size:0.85rem;word-break:break-all;">${c.occupant || "(reference)"}</td>
+                        <td style="color:var(--text-muted);">${c.n_occurrences}</td>
+                        <td style="color:${colour};font-weight:600;">${arrow}${c.contribution >= 0 ? "+" : ""}${c.contribution.toFixed(3)}</td>`;
+                    tbody.appendChild(tr);
+                });
+
+                const ptbody = document.getElementById("fw-preds-tbody");
+                ptbody.innerHTML = "";
+                (data.predictions || []).forEach(p => {
+                    const r = p.residual;
+                    const rColor = Math.abs(r) < 0.1 ? "#10b981" : (Math.abs(r) > 1.0 ? "#f87171" : "#fbbf24");
+                    const tr = document.createElement("tr");
+                    tr.innerHTML = `
+                        <td style="font-family:monospace;font-size:0.8rem;word-break:break-all;">${p.smiles}</td>
+                        <td style="font-family:monospace;">${p.y_observed.toFixed(3)}</td>
+                        <td style="font-family:monospace;">${p.y_predicted.toFixed(3)}</td>
+                        <td style="font-family:monospace;color:${rColor};font-weight:600;">${r >= 0 ? "+" : ""}${r.toFixed(3)}</td>`;
+                    ptbody.appendChild(tr);
+                });
+
+                fwResults.classList.remove("hidden");
+            } catch (err) {
+                alert(err.message);
+            } finally {
+                fwBtn.disabled = false;
+                fwBtn.textContent = "📐 Fit Model";
+            }
+        });
+    }
+
     // Enter key support
     smilesInput.addEventListener("keypress", (e) => { if (e.key === "Enter") predictBtn.click(); });
 });

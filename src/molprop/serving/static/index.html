@@ -82,6 +82,9 @@
             <button class="tab-btn" data-tab="depict">
                 <span class="tab-icon">🎨</span> Depict
             </button>
+            <button class="tab-btn" data-tab="freewilson">
+                <span class="tab-icon">📐</span> Free-Wilson
+            </button>
         </nav>
 
         <main>
@@ -1373,6 +1376,77 @@
                             </div>
                         </div>
                         <div id="dp-svg" style="display:flex;justify-content:center;align-items:center;min-height:300px;background:#fff;border-radius:12px;padding:1rem;"></div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ══════════════════════════════════════════════════════════════
+                 TAB 20 – FREE-WILSON SAR
+            ══════════════════════════════════════════════════════════════ -->
+            <section id="tab-freewilson" class="tab-panel hidden">
+                <div class="input-section glass-panel fade-in slide-up">
+                    <h2>📐 Free-Wilson SAR Analysis</h2>
+                    <p class="section-desc">Decompose a series around a common core, then fit an additive R-group model relating each substituent to the measured activity (e.g. pIC<sub>50</sub>).</p>
+
+                    <div style="margin-top:0.75rem;">
+                        <label for="fw-core">Core scaffold (SMARTS or SMILES)</label>
+                        <input type="text" id="fw-core" placeholder="c1ccccc1" style="width:100%;font-family:monospace;">
+                    </div>
+                    <div style="margin-top:0.75rem;">
+                        <label for="fw-data">Data — one analogue per line: <code>SMILES &lt;tab or comma&gt; activity</code></label>
+                        <textarea id="fw-data" rows="8" placeholder="c1ccc(O)cc1,5.0&#10;c1ccc(N)cc1,6.0&#10;c1ccc(C)cc1,4.5&#10;c1ccc(F)cc1,7.0" style="width:100%;font-family:monospace;padding:0.5rem;"></textarea>
+                    </div>
+                    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:0.75rem;margin-top:0.75rem;align-items:end;">
+                        <div>
+                            <label for="fw-min-occ">Min occurrences</label>
+                            <input type="number" id="fw-min-occ" value="1" min="1" max="100" style="width:100%;">
+                        </div>
+                        <button id="fw-btn" class="btn-primary" style="padding:0.6rem 1.5rem;">📐 Fit Model</button>
+                    </div>
+                </div>
+
+                <div id="fw-results" class="hidden slide-up" style="margin-top:1rem;">
+                    <div class="glass-panel" style="padding:1.25rem;">
+                        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:1rem;text-align:center;">
+                            <div>
+                                <div style="font-size:0.75rem;color:var(--text-muted);text-transform:uppercase;">Used</div>
+                                <div id="fw-used" style="font-size:1.8rem;font-weight:700;">0</div>
+                            </div>
+                            <div>
+                                <div style="font-size:0.75rem;color:var(--text-muted);text-transform:uppercase;">Intercept</div>
+                                <div id="fw-intercept" style="font-size:1.8rem;font-weight:700;color:#a78bfa;">—</div>
+                            </div>
+                            <div>
+                                <div style="font-size:0.75rem;color:var(--text-muted);text-transform:uppercase;">R²</div>
+                                <div id="fw-r2" style="font-size:1.8rem;font-weight:700;color:#10b981;">—</div>
+                            </div>
+                            <div>
+                                <div style="font-size:0.75rem;color:var(--text-muted);text-transform:uppercase;">RMSE</div>
+                                <div id="fw-rmse" style="font-size:1.8rem;font-weight:700;color:#fbbf24;">—</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="glass-panel" style="padding:1.25rem;margin-top:1rem;">
+                        <h3 style="margin-bottom:0.5rem;">📊 R-group contributions</h3>
+                        <div style="overflow-x:auto;">
+                            <table class="compare-table">
+                                <thead>
+                                    <tr><th>Position</th><th>Occupant</th><th>n</th><th>Δ contribution</th></tr>
+                                </thead>
+                                <tbody id="fw-contribs-tbody"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="glass-panel" style="padding:1.25rem;margin-top:1rem;">
+                        <h3 style="margin-bottom:0.5rem;">🔬 Per-molecule predictions</h3>
+                        <div style="overflow-x:auto;">
+                            <table class="compare-table">
+                                <thead>
+                                    <tr><th>SMILES</th><th>y observed</th><th>y predicted</th><th>residual</th></tr>
+                                </thead>
+                                <tbody id="fw-preds-tbody"></tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
             </section>

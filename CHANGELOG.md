@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.41.0] - 2026-05-22
+
+### Added — Free-Wilson SAR UI tab
+
+- **📐 Free-Wilson tab** wired to `POST /freewilson`:
+  - Core SMARTS/SMILES input + multi-line `SMILES, activity` textarea (TAB or comma).
+  - Configurable `min_occurrences` filter.
+  - KPI cards: used rows / intercept / R² / RMSE.
+  - **R-group contributions table** sorted by |Δ| with green ▲ positive / red ▼ negative arrows and reference-occupant marker.
+  - **Per-molecule predictions table** showing observed vs. predicted with colour-coded residuals.
+
 ## [2.40.0] - 2026-05-21
 
 ### Added — Depict tab, Prometheus metrics, Free-Wilson SAR

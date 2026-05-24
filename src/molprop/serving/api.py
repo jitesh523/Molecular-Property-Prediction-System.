@@ -5,10 +5,12 @@ Production-grade FastAPI service for SMILES-to-prediction workflows
 with batch support, model metadata, and explainability.
 """
 
+import asyncio
 import logging
 import os
 import time
 from collections import defaultdict
+from concurrent.futures import ThreadPoolExecutor
 from contextlib import asynccontextmanager
 from importlib.metadata import PackageNotFoundError
 from importlib.metadata import version as pkg_version
@@ -38,7 +40,7 @@ from molprop.features.diversity import maxmin_select
 from molprop.features.fingerprints import smiles_to_maccs, tanimoto_similarity
 from molprop.features.freewilson import free_wilson
 from molprop.features.functional_groups import detect_functional_groups
-from molprop.features.graphs import smiles_to_graph
+from molprop.features.graphs import ATOM_FEATURE_DIM, smiles_to_graph
 from molprop.features.isomers import enumerate_isomers
 from molprop.features.mcs import find_mcs
 from molprop.features.mmp import find_mmp
@@ -65,6 +67,9 @@ ROOT = Path(__file__).resolve().parent.parent.parent.parent
 ml_models = {}
 vae_state: dict = {}
 
+# Thread pool for offloading CPU-bound inference off the async event loop
+_inference_pool = ThreadPoolExecutor(max_workers=4, thread_name_prefix="infer")
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -73,10 +78,11 @@ async def lifespan(app: FastAPI):
     weights_path = os.getenv("MODEL_WEIGHTS", "best_model_gcn_bbbp.pt")
     dataset = os.getenv("MODEL_DATASET", "bbbp")
     task = os.getenv("MODEL_TASK", "classification")
+    target_col = os.getenv("MODEL_TARGET_COL", "")  # actual CSV column for the target label
 
     if os.path.exists(weights_path):
         model = load_gnn_model(
-            model_type=model_type, weights_path=weights_path, in_dim=9, hidden_dim=128
+            model_type=model_type, weights_path=weights_path, in_dim=ATOM_FEATURE_DIM, hidden_dim=128
         )
         ml_models["model"] = model
         ml_models["model_type"] = model_type
@@ -84,20 +90,27 @@ async def lifespan(app: FastAPI):
         ml_models["dataset"] = dataset
         ml_models["task"] = task
         ml_models["explainer"] = get_explainer(model, task_type="binary_classification")
+        ml_models["target_col"] = target_col  # resolved against actual CSV headers below
         log.info(f"Model loaded: {model_type} ({weights_path})")
 
         # --- Populate Vector DB ---
         try:
-            root_dir = Path(__file__).resolve().parent.parent.parent.parent
-            data_path = root_dir / "data" / "processed" / dataset / "processed.csv"
+            data_path = ROOT / "data" / "processed" / dataset / "processed.csv"
             if data_path.exists():
                 df = pd.read_csv(data_path)
                 log.info(f"Indexing {len(df)} molecules for vector search...")
 
+                # Resolve target column: env override → last non-SMILES column
+                resolved_col = ml_models.get("target_col") or df.columns[-1]
+                if resolved_col not in df.columns:
+                    log.warning(f"Target column '{resolved_col}' not in CSV; using '{df.columns[-1]}'")
+                    resolved_col = df.columns[-1]
+                ml_models["target_col"] = resolved_col
+
                 points = []
-                for i, row in df.iterrows():
-                    smiles = row["std_smiles"]
-                    target = row.get(ml_models["task"], row.get(df.columns[-1]))
+                for row in df.itertuples(index=True):
+                    smiles = getattr(row, "std_smiles")
+                    target = getattr(row, resolved_col, None)
                     g = smiles_to_graph(smiles)
                     if g:
                         embedding = model.encode(g).squeeze(0).cpu().numpy().tolist()
@@ -105,7 +118,7 @@ async def lifespan(app: FastAPI):
                             vector_store.create_collection(len(embedding))
                         points.append(
                             {
-                                "id": i,
+                                "id": row.Index,
                                 "vector": embedding,
                                 "payload": {
                                     "smiles": smiles,
@@ -424,10 +437,12 @@ def _predict_single(
 
     graph.batch = torch.zeros(graph.x.size(0), dtype=torch.long)
 
+    is_classification = ml_models.get("task", "classification") == "classification"
+
     with torch.no_grad():
         # Standard prediction
         out = ml_models["model"](graph)
-        pred = torch.sigmoid(out).item()
+        pred = torch.sigmoid(out).item() if is_classification else out.item()
 
         # Uncertainty estimation via MC Dropout
         uncertainty_std = None
@@ -435,7 +450,8 @@ def _predict_single(
             samples = []
             for _ in range(uncertainty_samples):
                 s_out = ml_models["model"](graph, mc_dropout=True)
-                samples.append(torch.sigmoid(s_out).item())
+                val = torch.sigmoid(s_out).item() if is_classification else s_out.item()
+                samples.append(val)
 
             samples_ts = torch.tensor(samples)
             uncertainty_std = {"task_1": round(samples_ts.std().item(), 6)}
@@ -476,7 +492,10 @@ async def predict(req: PredictRequest):
     if ml_models.get("model") is None:
         raise HTTPException(status_code=503, detail="Model is not loaded on the server.")
 
-    result = _predict_single(req.smiles, req.explain, req.uncertainty_samples)
+    loop = asyncio.get_event_loop()
+    result = await loop.run_in_executor(
+        _inference_pool, lambda: _predict_single(req.smiles, req.explain, req.uncertainty_samples)
+    )
     if result.error:
         raise HTTPException(status_code=400, detail=result.error)
     return result
@@ -497,19 +516,15 @@ async def predict_batch(req: BatchPredictRequest):
     if ml_models.get("model") is None:
         raise HTTPException(status_code=503, detail="Model is not loaded on the server.")
 
-    if len(req.smiles_list) == 0:
-        raise HTTPException(status_code=400, detail="smiles_list must contain at least one entry.")
-    if len(req.smiles_list) > MAX_BATCH_SIZE:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Batch size {len(req.smiles_list)} exceeds maximum of {MAX_BATCH_SIZE}.",
-        )
+    loop = asyncio.get_event_loop()
 
-    results = []
-    for smiles in req.smiles_list:
-        result = _predict_single(smiles, req.explain, req.uncertainty_samples)
-        results.append(result)
+    def _run_batch():
+        return [
+            _predict_single(smiles, req.explain, req.uncertainty_samples)
+            for smiles in req.smiles_list
+        ]
 
+    results = await loop.run_in_executor(_inference_pool, _run_batch)
     return results
 
 

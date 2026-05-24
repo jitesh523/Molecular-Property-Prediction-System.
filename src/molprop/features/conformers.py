@@ -41,7 +41,6 @@ def generate_3d_conformer(smiles: str, num_attempts: int = 10) -> Optional[Chem.
     except Exception as e:
         log.warning(f"MMFF optimization failed for {smiles}: {e}")
         # Return the unoptimized conformer as fallback
-        pass
 
     return mol
 

@@ -17,53 +17,11 @@ from molprop.models.gnn_mpnn import MPNNModel
 
 log = logging.getLogger(__name__)
 
-# Default architecture configs (match training defaults)
-DEFAULT_GNN_CONFIGS = {
-    "gcn": {
-        "cls": GCNModel,
-        "kwargs": {
-            "hidden_dim": 128,
-            "out_dim": 1,
-            "num_layers": 3,
-            "dropout": 0.2,
-        },
-    },
-    "gat": {
-        "cls": GATModel,
-        "kwargs": {
-            "hidden_dim": 128,
-            "out_dim": 1,
-            "num_layers": 3,
-            "dropout": 0.2,
-            "heads": 4,
-        },
-    },
-    "mpnn": {
-        "cls": MPNNModel,
-        "kwargs": {
-            "hidden_dim": 128,
-            "out_dim": 1,
-            "num_layers": 3,
-            "dropout": 0.2,
-            "edge_dim": 4,
-        },
-    },
-    "gin": {
-        "cls": GINModel,
-        "kwargs": {
-            "hidden_dim": 128,
-            "out_dim": 1,
-            "num_layers": 4,
-            "dropout": 0.2,
-        },
-    },
-}
-
 
 def load_gnn_model(
     model_type: str,
     weights_path: str,
-    in_dim: int = 9,
+    in_dim: int = 40,
     hidden_dim: int = 128,
     out_dim: int = 1,
     num_layers: int = 3,

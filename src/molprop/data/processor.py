@@ -72,10 +72,11 @@ class DatasetProcessor:
             f"     ✓ {name}: {orig_count} total -> {valid_count} valid -> {final_count} unique"
         )
 
-        # Save processed data
+        # Save processed data — keep original SMILES for traceability
         out_dir.mkdir(parents=True, exist_ok=True)
-        # Reorder columns to put std_smiles first for clarity
-        cols = ["std_smiles"] + [c for c in df.columns if c not in ["std_smiles", smiles_col]]
+        # Reorder: std_smiles first, original SMILES second, then remaining columns
+        other_cols = [c for c in df.columns if c not in ["std_smiles", smiles_col]]
+        cols = ["std_smiles", smiles_col] + other_cols
         df[cols].to_csv(out_path, index=False)
 
         # Save simplified metadata
@@ -85,7 +86,7 @@ class DatasetProcessor:
             f.write(f"Unique SMILES Count: {final_count}\n")
             f.write(f"Dropped: {orig_count - final_count}\n")
 
-        return df[cols]
+        return df[cols]  # type: ignore[return-value]
 
 
 def process_all_benchmark_datasets(raw_dir: Path, processed_dir: Path, datasets: List[str] = None):

@@ -59,6 +59,17 @@ def standardize_smiles(smiles: str, keep_chirality: bool = True) -> Optional[str
         return None
 
 
+def _mol_from_smiles_or_std(smiles: str):
+    """Parse SMILES to Mol, standardizing first only if not already canonical."""
+    mol = Chem.MolFromSmiles(smiles)
+    if mol is not None:
+        return mol
+    std = standardize_smiles(smiles)
+    if std is None:
+        return None
+    return Chem.MolFromSmiles(std)
+
+
 def passes_lipinski_ro5(
     smiles: str,
     mw_limit: float = 500.0,
@@ -74,7 +85,8 @@ def passes_lipinski_ro5(
     criteria (allowing one violation as per the original paper).
 
     Args:
-        smiles: Input SMILES string (will be standardized first).
+        smiles: Input SMILES string. Pre-standardized SMILES is accepted directly
+            without re-standardization, avoiding redundant RDKit passes.
         mw_limit: Molecular weight upper bound (default 500 Da).
         logp_limit: LogP upper bound (default 5).
         hbd_limit: H-bond donor count upper bound (default 5).
@@ -84,11 +96,7 @@ def passes_lipinski_ro5(
         Dict with keys 'passes' (bool), 'violations' (list[str]),
         and individual property values, or None if SMILES is invalid.
     """
-    std = standardize_smiles(smiles)
-    if std is None:
-        return None
-
-    mol = Chem.MolFromSmiles(std)
+    mol = _mol_from_smiles_or_std(smiles)
     if mol is None:
         return None
 
@@ -132,7 +140,7 @@ def veber_filter(
     Reference: Veber et al., J. Med. Chem. 2002, 45, 2615–2623.
 
     Args:
-        smiles: Input SMILES string.
+        smiles: Input SMILES string. Pre-standardized SMILES is accepted directly.
         rot_bonds_limit: Maximum allowed rotatable bonds.
         tpsa_limit: Maximum allowed TPSA (Å²).
 
@@ -140,10 +148,7 @@ def veber_filter(
         Dict with 'passes' (bool), 'violations' (list), 'RotatableBonds' and
         'TPSA' values, or None if the SMILES is invalid.
     """
-    std = standardize_smiles(smiles)
-    if std is None:
-        return None
-    mol = Chem.MolFromSmiles(std)
+    mol = _mol_from_smiles_or_std(smiles)
     if mol is None:
         return None
 
@@ -177,16 +182,13 @@ def ghose_filter(smiles: str) -> Optional[Dict]:
     Reference: Ghose et al., J. Comb. Chem. 1999, 1, 55–68.
 
     Args:
-        smiles: Input SMILES string.
+        smiles: Input SMILES string. Pre-standardized SMILES is accepted directly.
 
     Returns:
         Dict with 'passes' (bool), 'violations' (list), and individual
         property values (LogP, MW, MR, NumAtoms), or None for invalid SMILES.
     """
-    std = standardize_smiles(smiles)
-    if std is None:
-        return None
-    mol = Chem.MolFromSmiles(std)
+    mol = _mol_from_smiles_or_std(smiles)
     if mol is None:
         return None
 

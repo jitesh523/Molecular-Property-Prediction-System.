@@ -1,7 +1,8 @@
 from typing import List, Optional
 
 import numpy as np
-from rdkit import Chem, DataStructs
+from rdkit import Chem
+from rdkit import DataStructs
 from rdkit.Chem import AllChem, MACCSkeys
 
 
@@ -28,12 +29,6 @@ def smiles_to_morgan(
         fp = AllChem.GetMorganFingerprintAsBitVect(
             mol, radius, nBits=n_bits, useChirality=use_chirality
         )
-
-    # Convert to numpy array
-    arr = np.zeros((1,), dtype=np.int8)
-    # Using the documented way to convert BitVect to numpy
-    # In newer RDKit, DataStructs.ConvertToNumpyArray(fp, arr) is common
-    from rdkit import DataStructs
 
     arr = np.zeros((n_bits,), dtype=np.int8)
     DataStructs.ConvertToNumpyArray(fp, arr)

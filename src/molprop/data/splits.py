@@ -34,9 +34,11 @@ def scaffold_split(
     Perform a scaffold split on a list of SMILES.
 
     Splits are performed by grouping molecules by their Bemis-Murcko scaffold
-    and assigning whole scaffold groups to each set.
+    and assigning whole scaffold groups to each set. Within each size bucket the
+    groups are shuffled with ``seed`` for reproducibility.
     """
     np.testing.assert_almost_equal(frac_train + frac_val + frac_test, 1.0)
+    rng = random.Random(seed)
 
     # 1. Map each molecule index to its scaffold
     scaffolds = defaultdict(list)
@@ -44,10 +46,16 @@ def scaffold_split(
         scaffold = generate_scaffold(smiles)
         scaffolds[scaffold].append(idx)
 
-    # 2. Sort scaffold groups by size (descending)
-    # This ensures that large scaffold families are handled consistently.
-    # Note: Some versions of this algorithm use randomized sorting within size groups.
-    sorted_scaffold_sets = sorted(scaffolds.values(), key=len, reverse=True)
+    # 2. Sort scaffold groups by size (descending), shuffle ties for reproducibility
+    grouped = sorted(scaffolds.values(), key=len, reverse=True)
+    # Shuffle within same-size buckets so the split is seed-controlled
+    from itertools import groupby
+
+    sorted_scaffold_sets = []
+    for _, bucket in groupby(grouped, key=len):
+        bucket_list = list(bucket)
+        rng.shuffle(bucket_list)
+        sorted_scaffold_sets.extend(bucket_list)
 
     train_inds, val_inds, test_inds = [], [], []
     train_cutoff = frac_train * len(smiles_list)

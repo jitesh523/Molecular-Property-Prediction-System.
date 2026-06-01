@@ -58,6 +58,23 @@ class MPNNModel(GNNBase):
             self.layers.append(MPNNLayer(self.hidden_dim, self.hidden_dim, self.edge_dim))
 
     def forward(self, data, mc_dropout: bool = False):
+        """Forward pass for molecular property prediction with edge features.
+        
+        Executes message passing that incorporates both node and edge features,
+        enabling the model to distinguish molecular structures with identical
+        connectivity but different bond types (e.g., aromatic vs. saturated).
+        
+        Args:
+            data: PyG Data object with attributes:
+                - x (Tensor): Node feature matrix of shape [num_nodes, in_dim]
+                - edge_index (LongTensor): Edge indices [2, num_edges]
+                - edge_attr (Tensor): Edge features [num_edges, edge_dim]
+                - batch (LongTensor): Batch assignment vector [num_nodes]
+            mc_dropout (bool): Enable Monte Carlo dropout for uncertainty estimation.
+        
+        Returns:
+            Tensor: Predicted molecular properties of shape [batch_size, out_dim].
+        """
         x, edge_index, edge_attr, batch = data.x, data.edge_index, data.edge_attr, data.batch
         is_training = self.training or mc_dropout
 
@@ -74,6 +91,17 @@ class MPNNModel(GNNBase):
 
     @torch.no_grad()
     def encode(self, data):
+        """Extract latent graph embedding incorporating edge features.
+        
+        Generates bond-aware molecular fingerprint for vector similarity search
+        and structural comparison of molecules.
+        
+        Args:
+            data: PyG Data object with same structure as forward().
+        
+        Returns:
+            Tensor: Molecular embedding of shape [batch_size, hidden_dim].
+        """
         x, edge_index, edge_attr, batch = data.x, data.edge_index, data.edge_attr, data.batch
         for layer in self.layers:
             x = layer(x, edge_index, edge_attr)

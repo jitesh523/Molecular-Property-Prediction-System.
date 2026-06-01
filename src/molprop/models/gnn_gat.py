@@ -32,6 +32,21 @@ class GATModel(GNNBase):
         )
 
     def forward(self, data, mc_dropout: bool = False):
+        """Forward pass for molecular property prediction using attention mechanism.
+        
+        Applies multi-head graph attention convolutions to learn adaptive edge
+        weights between atoms. Reduces attention heads in final layer for readout.
+        
+        Args:
+            data: PyG Data object with attributes:
+                - x (Tensor): Node feature matrix of shape [num_nodes, in_dim]
+                - edge_index (LongTensor): Edge indices [2, num_edges]
+                - batch (LongTensor): Batch assignment vector [num_nodes]
+            mc_dropout (bool): Enable Monte Carlo dropout for uncertainty estimation.
+        
+        Returns:
+            Tensor: Predicted molecular properties of shape [batch_size, out_dim].
+        """
         x, edge_index, batch = data.x, data.edge_index, data.batch
         is_training = self.training or mc_dropout
 
@@ -50,6 +65,17 @@ class GATModel(GNNBase):
 
     @torch.no_grad()
     def encode(self, data):
+        """Extract latent graph embedding for similarity search.
+        
+        Generates molecular fingerprint by aggregating attention-weighted
+        node representations across all graphs in the batch.
+        
+        Args:
+            data: PyG Data object with same structure as forward().
+        
+        Returns:
+            Tensor: Molecular embedding of shape [batch_size, hidden_dim].
+        """
         x, edge_index, batch = data.x, data.edge_index, data.batch
         for i, conv in enumerate(self.convs):
             x = conv(x, edge_index)

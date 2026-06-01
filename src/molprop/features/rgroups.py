@@ -12,11 +12,14 @@ Returns:
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from typing import Optional
 
 from rdkit import Chem
 from rdkit.Chem import AllChem, rdRGroupDecomposition
+
+log = logging.getLogger(__name__)
 
 
 @dataclass
@@ -110,13 +113,15 @@ def decompose_rgroups(core: str, smiles_list: list[str]) -> Optional[RGroupDecom
         try:
             res = decomp.Add(m)
             matched_flags[i] = res >= 0
-        except Exception:
+        except (RuntimeError, ValueError) as e:
+            log.debug(f"R-group decomposition failed for molecule {i}: {e}")
             matched_flags[i] = False
 
     try:
         decomp.Process()
         groups = decomp.GetRGroupsAsRows()  # list[dict[label -> Mol]]
-    except Exception:
+    except (RuntimeError, ValueError) as e:
+        log.debug(f"R-group decomposition processing failed: {e}")
         groups = []
 
     # Build per-molecule rows

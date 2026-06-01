@@ -33,6 +33,22 @@ class GINModel(GNNBase):
             self.batch_norms.append(BatchNorm(dims[i + 1]))
 
     def forward(self, data, mc_dropout: bool = False):
+        """Forward pass for molecular property prediction.
+        
+        Applies iterative GIN convolutions with multi-scale readout (JK-sum)
+        to distinguish non-isomorphic molecular graphs.
+        
+        Args:
+            data: PyG Data object with attributes:
+                - x (Tensor): Node feature matrix of shape [num_nodes, in_dim]
+                - edge_index (LongTensor): Edge indices [2, num_edges]
+                - batch (LongTensor): Batch assignment vector [num_nodes]
+            mc_dropout (bool): Enable Monte Carlo dropout for uncertainty estimation.
+                When True, applies dropout even at inference time for Bayesian estimates.
+        
+        Returns:
+            Tensor: Predicted molecular properties of shape [batch_size, out_dim].
+        """
         x, edge_index, batch = data.x, data.edge_index, data.batch
         is_training = self.training or mc_dropout
 
@@ -51,6 +67,17 @@ class GINModel(GNNBase):
 
     @torch.no_grad()
     def encode(self, data):
+        """Extract latent graph embedding for similarity search and interpretation.
+        
+        Performs inference pass without backpropagation, returning multi-layer
+        aggregated node embeddings as the molecular fingerprint.
+        
+        Args:
+            data: PyG Data object with same structure as forward().
+        
+        Returns:
+            Tensor: Molecular embedding of shape [batch_size, hidden_dim].
+        """
         x, edge_index, batch = data.x, data.edge_index, data.batch
         node_embeddings = []
         for conv, bn in zip(self.convs, self.batch_norms, strict=False):

@@ -207,15 +207,20 @@ _metrics: dict[str, dict] = {
 
 @app.middleware("http")
 async def add_timing_header(request: Request, call_next):
-    """Add X-Process-Time header and record in-process metrics."""
+    """Add X-Process-Time header and record in-process metrics.
+    
+    Tracks request latency and error rates per endpoint for production monitoring.
+    Logs exceptions with endpoint context for easier debugging and troubleshooting.
+    """
     start = time.perf_counter()
     key = f"{request.method} {request.url.path}"
     try:
         response = await call_next(request)
-    except Exception:
+    except Exception as exc:
         with _metrics_lock:
             _metrics["requests_total"][key] += 1
             _metrics["requests_errors"][key] += 1
+        log.error(f"Unhandled exception on {key}: {type(exc).__name__}: {exc}")
         raise
     elapsed = time.perf_counter() - start
     response.headers["X-Process-Time"] = f"{elapsed:.4f}s"

@@ -11,11 +11,14 @@ reference by name instead of pasting a SMARTS.
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from typing import Optional
 
 from rdkit import Chem
 from rdkit.Chem import AllChem
+
+log = logging.getLogger(__name__)
 
 # ── Named reaction library ───────────────────────────────────────────────────
 # Format: name -> SMARTS (single-reactant or multi-reactant separated by '.')
@@ -82,7 +85,8 @@ def run_reaction(
     """
     try:
         rxn = AllChem.ReactionFromSmarts(smarts)
-    except Exception:
+    except (ValueError, RuntimeError, KeyError) as e:
+        log.warning(f"Invalid reaction SMARTS: {smarts} - {e}")
         return None
     if rxn is None:
         return None
@@ -106,7 +110,8 @@ def run_reaction(
             continue
         try:
             outs = rxn.RunReactants(tuple(mols))
-        except Exception:  # noqa: S112
+        except (RuntimeError, ValueError) as e:
+            log.debug(f"Reaction execution failed for substrate set {tup}: {e}")
             continue
         # outs: tuple of tuples of products
         local_set: list[str] = []
@@ -114,7 +119,8 @@ def run_reaction(
             for p in prod_tuple:
                 try:
                     Chem.SanitizeMol(p)
-                except Exception:  # noqa: S112
+                except (RuntimeError, ValueError) as e:
+                    log.debug(f"Product sanitization failed: {e}")
                     continue
                 smi = Chem.MolToSmiles(p)
                 if smi and smi not in set(local_set):

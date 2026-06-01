@@ -9,6 +9,7 @@ canonical tautomer.
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from typing import Optional
 
@@ -18,6 +19,8 @@ from rdkit.Chem.EnumerateStereoisomers import (
     StereoEnumerationOptions,
 )
 from rdkit.Chem.MolStandardize import rdMolStandardize
+
+log = logging.getLogger(__name__)
 
 
 @dataclass
@@ -76,7 +79,8 @@ def enumerate_isomers(
     try:
         canonical_taut_mol = enumerator.Canonicalize(mol)
         canonical_taut = Chem.MolToSmiles(canonical_taut_mol)
-    except Exception:
+    except (TypeError, ValueError, RuntimeError) as e:
+        log.debug(f"Failed to canonicalize tautomer for {smiles}: {e}")
         canonical_taut = None
 
     try:
@@ -90,8 +94,9 @@ def enumerate_isomers(
                     is_canonical=(smi == canonical_taut),
                 )
             )
-    except Exception:
+    except (TypeError, ValueError, RuntimeError) as e:
         # Fall back to the input itself
+        log.debug(f"Tautomer enumeration failed for {smiles}, using input: {e}")
         taut_results = [
             IsomerResult(
                 smiles=canonical_input,
@@ -118,7 +123,8 @@ def enumerate_isomers(
                     is_canonical=(smi == canonical_input),
                 )
             )
-    except Exception:
+    except (TypeError, ValueError, RuntimeError) as e:
+        log.debug(f"Stereoisomer enumeration failed for {smiles}, using input: {e}")
         stereo_results = [
             IsomerResult(
                 smiles=canonical_input,

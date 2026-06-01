@@ -15,6 +15,7 @@ molecules but does NOT require the contrib FPscores file at runtime.
 
 from __future__ import annotations
 
+import logging
 import math
 from dataclasses import dataclass
 from typing import Optional
@@ -22,6 +23,8 @@ from typing import Optional
 from rdkit import Chem
 from rdkit.Chem import AllChem
 from rdkit.Chem.Scaffolds import MurckoScaffold
+
+log = logging.getLogger(__name__)
 
 
 @dataclass
@@ -47,16 +50,27 @@ class ScaffoldAnalysis:
 
 
 def _bemis_murcko(mol: Chem.Mol) -> Optional[Chem.Mol]:
+    """Extract Bemis–Murcko scaffold from molecule.
+    
+    Returns the scaffold with side chains stripped to generic ring system,
+    or None if extraction fails.
+    """
     try:
         return MurckoScaffold.GetScaffoldForMol(mol)
-    except Exception:
+    except (ValueError, RuntimeError) as e:
+        log.debug(f"Bemis-Murcko scaffold extraction failed: {e}")
         return None
 
 
 def _generic_murcko(scaffold_mol: Chem.Mol) -> Optional[Chem.Mol]:
+    """Convert scaffold to generic form (all atoms to C, bonds to single).
+    
+    Returns the generic scaffold or None if conversion fails.
+    """
     try:
         return MurckoScaffold.MakeScaffoldGeneric(scaffold_mol)
-    except Exception:
+    except (ValueError, RuntimeError) as e:
+        log.debug(f"Generic Murcko conversion failed: {e}")
         return None
 
 

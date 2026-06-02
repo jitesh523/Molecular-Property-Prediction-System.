@@ -1,4 +1,5 @@
 import logging
+import re
 from pathlib import Path
 from typing import List, Optional
 
@@ -28,9 +29,28 @@ class DatasetProcessor:
         keep_chirality: bool = True,
         force: bool = False,
     ) -> Optional[pd.DataFrame]:
+        """Processes a single dataset: Load -> Standardize -> Drop Invalid -> Save.
+        
+        Args:
+            name: Dataset name (alphanumeric + underscore/hyphen only). Used to find
+                  raw data in {raw_dir}/{name}/full.csv and save to {processed_dir}/{name}/processed.csv
+            smiles_col: Column name in raw CSV containing SMILES strings (default 'smiles')
+            keep_chirality: Preserve stereochemistry information in standardized SMILES
+            force: If True, reprocess even if processed.csv already exists
+            
+        Returns:
+            Processed DataFrame on success, None if inputs invalid or processing fails
+            
+        Raises:
+            ValueError: If dataset name contains invalid characters (path traversal protection)
         """
-        Processes a single dataset: Load -> Standardize -> Drop Invalid -> Save.
-        """
+        # Validate dataset name - prevent path traversal attacks
+        if not re.match(r'^[a-zA-Z0-9_\-]+$', name):
+            raise ValueError(
+                f"Invalid dataset name '{name}'. "
+                "Must contain only alphanumeric characters, underscores, and hyphens."
+            )
+        
         raw_path = self.raw_dir / name / "full.csv"
         out_dir = self.processed_dir / name
         out_path = out_dir / "processed.csv"
@@ -44,11 +64,21 @@ class DatasetProcessor:
             return pd.read_csv(out_path)
 
         log.info(f"  ⚙️  Processing {name}...")
-        df = pd.read_csv(raw_path)
+        try:
+            df = pd.read_csv(raw_path, encoding='utf-8')
+        except UnicodeDecodeError:
+            log.error(f"Failed to decode {name}; file is not valid UTF-8")
+            return None
+        except Exception as e:
+            log.error(f"Failed to read {name}: {e}")
+            return None
 
         if smiles_col not in df.columns:
-            log.error(f"SMILES column '{smiles_col}' not found in {name}")
-            return None
+            available = ', '.join(df.columns.tolist())
+            raise ValueError(
+                f"SMILES column '{smiles_col}' not found in {name}. "
+                f"Available columns: {available}"
+            )
 
         # Apply standardization
         tqdm.pandas(desc=f"Standardizing {name}")

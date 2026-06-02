@@ -23,7 +23,7 @@ import torch
 from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from molprop.data.smiles_vocab import SmilesVocab
 from molprop.data.splits import generate_scaffold
@@ -256,6 +256,26 @@ class BatchPredictRequest(BaseModel):
     uncertainty_samples: int = Field(
         0, ge=0, le=50, description="Number of MC Dropout samples for uncertainty estimation"
     )
+    
+    @field_validator('smiles_list', mode='before')
+    @classmethod
+    def validate_smiles_list(cls, v):
+        """Validate that smiles_list is non-empty and contains valid strings."""
+        if not isinstance(v, list):
+            raise ValueError('smiles_list must be a list')
+        if len(v) == 0:
+            raise ValueError('smiles_list cannot be empty')
+        if len(v) > MAX_BATCH_SIZE:
+            raise ValueError(f'smiles_list exceeds maximum size ({MAX_BATCH_SIZE})')
+        
+        for i, smiles in enumerate(v):
+            if not isinstance(smiles, str):
+                raise ValueError(f'smiles_list[{i}] must be a string, got {type(smiles).__name__}')
+            if not smiles or not smiles.strip():
+                raise ValueError(f'smiles_list[{i}] is empty or whitespace-only')
+            if len(smiles) > MAX_SMILES_LEN:
+                raise ValueError(f'smiles_list[{i}] exceeds maximum length ({MAX_SMILES_LEN})')
+        return v
 
 
 class PredictionResult(BaseModel):

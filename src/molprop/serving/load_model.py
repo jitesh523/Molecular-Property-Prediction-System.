@@ -29,12 +29,11 @@ def load_gnn_model(
     device: str = "cpu",
     **kwargs,
 ) -> torch.nn.Module:
-    """
-    Loads a predefined GNN model architecture and its weights.
+    """Loads a predefined GNN model architecture and its weights.
 
     Args:
         model_type: One of 'gcn', 'gat', 'mpnn', 'gin'.
-        weights_path: Path to the saved state dict.
+        weights_path: Path to the saved state dict (must be an existing file).
         in_dim: Input node feature dimension.
         hidden_dim: Hidden layer dimension.
         out_dim: Output dimension (number of tasks).
@@ -42,7 +41,22 @@ def load_gnn_model(
         dropout: Dropout probability.
         device: Device to load model onto.
         **kwargs: Extra kwargs (e.g., heads for GAT, edge_dim for MPNN).
+        
+    Returns:
+        Initialized GNN model in eval mode on specified device.
+        
+    Raises:
+        FileNotFoundError: If weights_path does not exist.
+        ValueError: If weights_path is not a file or model_type is unknown.
+        RuntimeError: If model state dict loading fails (corrupted weights).
     """
+    # Validate weights file exists and is readable
+    weights_file = Path(weights_path).expanduser().resolve()
+    if not weights_file.exists():
+        raise FileNotFoundError(f"Model weights not found: {weights_path}")
+    if not weights_file.is_file():
+        raise ValueError(f"weights_path is not a file: {weights_path}")
+    
     if model_type == "gcn":
         model = GCNModel(
             in_dim=in_dim,
@@ -80,13 +94,40 @@ def load_gnn_model(
             dropout=dropout,
         )
     else:
-        raise ValueError(f"Unknown model_type: {model_type}")
+        valid_types = {'gcn', 'gat', 'mpnn', 'gin'}
+        raise ValueError(
+            f"Unknown model_type: {model_type}. "
+            f"Must be one of {valid_types}"
+        )
 
-    # nosec: B614 - loading local trusted weights
-    model.load_state_dict(torch.load(weights_path, map_location=device, weights_only=True))
+    # Load weights with error context
+    try:
+        # nosec: B614 - loading local trusted weights from configured path
+        state_dict = torch.load(weights_file, map_location=device, weights_only=True)
+        model.load_state_dict(state_dict)
+    except FileNotFoundError as e:
+        log.error(f"Weights file disappeared during load: {weights_path}")
+        raise
+    except RuntimeError as e:
+        log.error(
+            f"Failed to load state dict for {model_type} from {weights_path}. "
+            f"Weights may be corrupted or incompatible: {e}",
+            exc_info=True
+        )
+        raise
+    except Exception as e:
+        log.error(
+            f"Unexpected error loading {model_type} model from {weights_path}: {e}",
+            exc_info=True
+        )
+        raise
+    
     model.to(device)
     model.eval()
-    log.info(f"Loaded {model_type} model from {weights_path}")
+    log.info(
+        f"Loaded {model_type} model ({in_dim}→{hidden_dim}→{out_dim}, {num_layers} layers) "
+        f"from {weights_file}"
+    )
     return model
 
 

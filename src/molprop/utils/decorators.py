@@ -19,8 +19,17 @@ log = logging.getLogger(__name__)
 
 
 def timing(func: F) -> F:
-    """
-    Decorator to log execution time of a function.
+    """Decorator to log execution time of a function.
+    
+    Measures wall-clock time from function start to completion (including exceptions)
+    and logs elapsed time at debug level. Useful for profiling performance-critical
+    code paths.
+
+    Args:
+        func: Function to wrap
+        
+    Returns:
+        Wrapped function with timing logged
 
     Example:
         @timing
@@ -47,25 +56,34 @@ def retry(
     backoff_factor: float = 2.0,
     exceptions: tuple[type[Exception], ...] = (Exception,),
 ) -> Callable[[F], F]:
-    """
-    Decorator to retry a function on failure.
+    """Decorator to retry a function on failure with exponential backoff.
+    
+    Retries the decorated function up to max_attempts times if it raises an
+    exception matching the specified exception types. Between retries, waits
+    for delay_seconds * (backoff_factor ^ retry_count) seconds.
+    
+    All exceptions are caught and re-raised after final attempt; the last
+    exception encountered is the one raised.
 
     Args:
-        max_attempts: Maximum number of attempts.
-        delay_seconds: Initial delay between retries.
-        backoff_factor: Multiplier for delay after each retry.
-        exceptions: Tuple of exception types to catch and retry on.
+        max_attempts: Maximum number of attempts (default 3).
+        delay_seconds: Initial delay between retries in seconds (default 1.0).
+        backoff_factor: Multiplier for delay after each retry (default 2.0).
+        exceptions: Tuple of exception types to catch and retry on (default Exception).
+        
+    Returns:
+        Decorator function
 
     Example:
-        @retry(max_attempts=3, delay_seconds=0.5)
-        def flaky_operation():
+        @retry(max_attempts=3, delay_seconds=0.5, exceptions=(ConnectionError, TimeoutError))
+        def flaky_api_call():
             ...
     """
 
     def decorator(func: F) -> F:
         @functools.wraps(func)
         def wrapper(*args: Any, **kwargs: Any) -> Any:
-            last_exception = None
+            last_exception: Optional[Exception] = None
             delay = delay_seconds
 
             for attempt in range(1, max_attempts + 1):
@@ -83,9 +101,11 @@ def retry(
                     else:
                         log.error(f"{func.__name__} failed after {max_attempts} attempts")
 
+            # Always have a last_exception here (at least from final attempt)
             if last_exception:
                 raise last_exception
-            raise RuntimeError(f"Unexpected failure in retry decorator for {func.__name__}")
+            # This should never happen, but if it does, it's a logic error
+            raise RuntimeError(f"Unexpected state in retry decorator for {func.__name__}")  # pragma: no cover
 
         return cast(F, wrapper)
 
@@ -96,15 +116,21 @@ def handle_errors(
     default_return: Any = None,
     log_traceback: bool = True,
 ) -> Callable[[F], F]:
-    """
-    Decorator to catch and log exceptions.
+    """Decorator to catch and log exceptions, returning a default value.
+    
+    Wraps function execution with a try/except that catches both MolpropError
+    and generic exceptions, logging them appropriately before returning a
+    default value. Useful for functions that should fail gracefully.
 
     Args:
-        default_return: Value to return if exception occurs.
-        log_traceback: Whether to log full traceback.
+        default_return: Value to return if any exception occurs.
+        log_traceback: Whether to include full traceback in log output (default True).
+        
+    Returns:
+        Decorator function
 
     Example:
-        @handle_errors(default_return=[])
+        @handle_errors(default_return=[], log_traceback=True)
         def parse_data():
             ...
     """
@@ -127,16 +153,27 @@ def handle_errors(
 
 
 def validate_input(**validators: Callable[[Any], Any]) -> Callable[[F], F]:
-    """
-    Decorator to validate function arguments.
+    """Decorator to validate function keyword arguments before execution.
+    
+    Applies validator functions to specified keyword arguments, raising an
+    exception if any validator fails. Useful for enforcing constraints on
+    function inputs (e.g., SMILES format, numeric bounds).
+    
+    Note: Currently only validates keyword arguments; positional arguments
+    are not validated.
 
     Args:
         **validators: Mapping of argument name to validator function.
+                     Validator should accept one argument and return validated value
+                     or raise an exception.
+        
+    Returns:
+        Decorator function
 
     Example:
         @validate_input(
             smiles=validate_smiles,
-            batch_size=lambda x: validate_batch_size(x)
+            batch_size=lambda x: x if x > 0 else error('batch_size must be positive')
         )
         def predict(smiles: str, batch_size: int):
             ...

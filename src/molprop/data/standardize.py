@@ -14,8 +14,7 @@ reionizer = rdMolStandardize.Reionizer()
 
 
 def standardize_smiles(smiles: str, keep_chirality: bool = True) -> Optional[str]:
-    """
-    Standardize a SMILES string using RDKit standard protocol.
+    """Standardize a SMILES string using RDKit standard protocol.
 
     Protocol:
       1. Parse SMILES → Mol
@@ -26,12 +25,19 @@ def standardize_smiles(smiles: str, keep_chirality: bool = True) -> Optional[str
       6. Canonicalize SMILES (with optional stereochemistry)
 
     Args:
-        smiles (str): Input SMILES string
-        keep_chirality (bool): If True, preserves stereochemical information in output
+        smiles: Input SMILES string. Must be non-empty and a valid string.
+        keep_chirality: If True, preserves stereochemical information in output
 
     Returns:
-        Optional[str]: Clean canonical SMILES, or None if parsing fails
+        Clean canonical SMILES, or None if SMILES is invalid.
+        
+    Raises:
+        ValueError: If smiles is empty or not a string.
     """
+    # Input validation
+    if not isinstance(smiles, str) or not smiles.strip():
+        raise ValueError("smiles must be a non-empty string")
+    
     try:
         mol = Chem.MolFromSmiles(smiles)
         if mol is None:
@@ -54,7 +60,7 @@ def standardize_smiles(smiles: str, keep_chirality: bool = True) -> Optional[str
         can = Chem.CanonSmiles(Chem.MolToSmiles(mol), useChiral=int(keep_chirality))
         return can
 
-    except Exception as e:
+    except (TypeError, ValueError, RuntimeError) as e:
         log.debug(f"Standardization exception for {smiles}: {e}")
         return None
 
@@ -77,8 +83,7 @@ def passes_lipinski_ro5(
     hbd_limit: int = 5,
     hba_limit: int = 10,
 ) -> Optional[Dict[str, object]]:
-    """
-    Check whether a molecule passes Lipinski's Rule of Five.
+    """Check whether a molecule passes Lipinski's Rule of Five.
 
     The Ro5 is a widely used heuristic for oral bioavailability: a drug
     candidate is likely orally active if it satisfies *at least 3 of 4*
@@ -87,15 +92,29 @@ def passes_lipinski_ro5(
     Args:
         smiles: Input SMILES string. Pre-standardized SMILES is accepted directly
             without re-standardization, avoiding redundant RDKit passes.
-        mw_limit: Molecular weight upper bound (default 500 Da).
-        logp_limit: LogP upper bound (default 5).
-        hbd_limit: H-bond donor count upper bound (default 5).
-        hba_limit: H-bond acceptor count upper bound (default 10).
+        mw_limit: Molecular weight upper bound (default 500 Da). Must be > 0.
+        logp_limit: LogP upper bound (default 5). Must be > 0.
+        hbd_limit: H-bond donor count upper bound (default 5). Must be > 0.
+        hba_limit: H-bond acceptor count upper bound (default 10). Must be > 0.
 
     Returns:
         Dict with keys 'passes' (bool), 'violations' (list[str]),
         and individual property values, or None if SMILES is invalid.
+        
+    Raises:
+        ValueError: If limits are invalid (not positive) or SMILES is empty.
     """
+    # Input validation
+    if not isinstance(smiles, str) or not smiles.strip():
+        raise ValueError("smiles must be a non-empty string")
+    if mw_limit <= 0:
+        raise ValueError(f"mw_limit must be > 0, got {mw_limit}")
+    if logp_limit <= 0:
+        raise ValueError(f"logp_limit must be > 0, got {logp_limit}")
+    if hbd_limit <= 0:
+        raise ValueError(f"hbd_limit must be > 0, got {hbd_limit}")
+    if hba_limit <= 0:
+        raise ValueError(f"hba_limit must be > 0, got {hba_limit}")
     mol = _mol_from_smiles_or_std(smiles)
     if mol is None:
         return None

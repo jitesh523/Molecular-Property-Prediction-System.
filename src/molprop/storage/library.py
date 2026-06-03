@@ -11,11 +11,15 @@ This is a lightweight stdlib-only solution; no SQLAlchemy required.
 from __future__ import annotations
 
 import json
+import logging
+import re
 import sqlite3
 import threading
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+
+log = logging.getLogger(__name__)
 
 DB_LOCK = threading.Lock()
 
@@ -76,7 +80,33 @@ class CompoundLibrary:
         properties: dict[str, Any] | None = None,
         notes: str | None = None,
     ) -> dict[str, Any]:
-        """Insert or update a compound (idempotent on (smiles, project))."""
+        """Insert or update a compound (idempotent on (smiles, project)).
+        
+        Args:
+            smiles: SMILES string. Must be non-empty.
+            name: Optional compound name.
+            project: Project identifier. Must be non-empty and alphanumeric (prevents path traversal).
+            tags: Optional list of string tags.
+            properties: Optional dict of properties to store as JSON.
+            notes: Optional notes/description.
+            
+        Returns:
+            Dictionary with full compound record (id, smiles, name, etc).
+            
+        Raises:
+            ValueError: If smiles/project is empty or project contains invalid characters.
+        """
+        # Input validation
+        if not smiles or not smiles.strip():
+            raise ValueError("smiles cannot be empty")
+        if not project or not project.strip():
+            raise ValueError("project cannot be empty")
+        if not re.match(r'^[\w\-\.]+$', project):
+            raise ValueError(
+                f"Invalid project name '{project}'. "
+                f"Must contain only alphanumeric, underscore, hyphen, or dot characters."
+            )
+        
         ts = _now()
         tags_json = json.dumps(tags or [])
         props_json = json.dumps(properties or {})
@@ -111,6 +141,29 @@ class CompoundLibrary:
         limit: int = 100,
         offset: int = 0,
     ) -> list[dict[str, Any]]:
+        """List compounds with optional filtering.
+        
+        Args:
+            project: Filter by project name.
+            tag: Filter by tag (post-query; use with caution on large libraries).
+            search: Full-text search across SMILES, name, notes.
+            limit: Maximum results to return. Must be > 0 and <= 10000.
+            offset: Result offset. Must be >= 0.
+            
+        Returns:
+            List of matching compound dictionaries.
+            
+        Raises:
+            ValueError: If limit or offset are out of valid ranges.
+        """
+        # Validate pagination parameters
+        if limit <= 0:
+            raise ValueError(f"limit must be > 0, got {limit}")
+        if limit > 10000:
+            raise ValueError(f"limit exceeds maximum (10000), got {limit}")
+        if offset < 0:
+            raise ValueError(f"offset must be >= 0, got {offset}")
+        
         clauses = []
         params: list[Any] = []
         if project:
@@ -173,6 +226,11 @@ class CompoundLibrary:
         return [r["project"] for r in rows]
 
     def all_tags(self) -> list[str]:
+        """Get all unique tags across all compounds.
+        
+        Returns:
+            Sorted list of unique tag strings.
+        """
         with DB_LOCK, self._connect() as conn:
             rows = conn.execute("SELECT DISTINCT tags FROM compounds").fetchall()
         seen: set[str] = set()
@@ -180,7 +238,8 @@ class CompoundLibrary:
             try:
                 for t in json.loads(r["tags"] or "[]"):
                     seen.add(t)
-            except json.JSONDecodeError:
+            except json.JSONDecodeError as e:
+                log.warning(f"Failed to decode tags JSON: {e}")
                 continue
         return sorted(seen)
 

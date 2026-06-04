@@ -283,6 +283,3 @@ molprop-prediction/
 
 ---
 
-## 📄 License
-
-MIT © 2026

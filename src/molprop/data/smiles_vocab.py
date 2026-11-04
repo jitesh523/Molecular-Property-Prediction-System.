@@ -3,7 +3,7 @@ SMILES character-level tokenizer and vocabulary builder.
 
 Provides a minimal but correct tokenizer that handles:
 - Multi-character tokens: Cl, Br, Si, Se, etc.
-- Special ring/bond notations: %, @, #, =, +, -, etc.
+- Special ring/bond notations and wildcard atoms: %, @, #, =, +, -, *, etc.
 - Special tokens: <pad>, <sos>, <eos>, <unk>
 """
 
@@ -14,7 +14,7 @@ import re
 from pathlib import Path
 
 # Regex matching multi-char and single-char SMILES tokens (order matters)
-_SMILES_PATTERN = re.compile(r"Cl|Br|Si|Se|@@|%\d{2}|[A-Za-z]|[\[\]()=#@+\-:\/\\\.%0-9]")
+_SMILES_PATTERN = re.compile(r"Cl|Br|Si|Se|@@|%\d{2}|[A-Za-z]|[\[\]()=#@+\-:\/\\\.%*0-9]")
 
 # Special token definitions
 PAD = "<pad>"

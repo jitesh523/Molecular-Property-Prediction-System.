@@ -30,14 +30,14 @@ def standardize_smiles(smiles: str, keep_chirality: bool = True) -> Optional[str
 
     Returns:
         Clean canonical SMILES, or None if SMILES is invalid.
-        
+
     Raises:
         ValueError: If smiles is empty or not a string.
     """
     # Input validation
     if not isinstance(smiles, str) or not smiles.strip():
         raise ValueError("smiles must be a non-empty string")
-    
+
     try:
         mol = Chem.MolFromSmiles(smiles)
         if mol is None:
@@ -100,7 +100,7 @@ def passes_lipinski_ro5(
     Returns:
         Dict with keys 'passes' (bool), 'violations' (list[str]),
         and individual property values, or None if SMILES is invalid.
-        
+
     Raises:
         ValueError: If limits are invalid (not positive) or SMILES is empty.
     """
@@ -196,7 +196,7 @@ def ghose_filter(smiles: str) -> Optional[Dict]:
     - −0.4 ≤ LogP ≤ 5.6
     - 160 ≤ MW ≤ 480 Da
     - 40 ≤ Molar Refractivity ≤ 130
-    - 20 ≤ NumAtoms ≤ 70
+    - 20 ≤ NumAtoms ≤ 70 (including hydrogens)
 
     Reference: Ghose et al., J. Comb. Chem. 1999, 1, 55–68.
 
@@ -214,7 +214,7 @@ def ghose_filter(smiles: str) -> Optional[Dict]:
     logp = Descriptors.MolLogP(mol)
     mw = Descriptors.MolWt(mol)
     mr = Descriptors.MolMR(mol)
-    num_atoms = mol.GetNumAtoms()
+    num_atoms = mol.GetNumAtoms(onlyExplicit=False)
 
     violations = []
     if not (-0.4 <= logp <= 5.6):

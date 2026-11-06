@@ -334,6 +334,11 @@ def download_dataset(name: str, info: dict) -> bool:
 
 
 def main():
+    import argparse
+
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--datasets", nargs="+", choices=sorted(DATASETS), default=list(DATASETS))
+    args = parser.parse_args()
     log.info("=" * 64)
     log.info("  MolNet Dataset Downloader")
     log.info(f"  Output: {DATA_DIR}")
@@ -341,7 +346,8 @@ def main():
 
     ok, failed = [], []
 
-    for name, info in DATASETS.items():
+    for name in args.datasets:
+        info = DATASETS[name]
         try:
             success = download_dataset(name, info)
             (ok if success else failed).append(name)
@@ -351,6 +357,7 @@ def main():
 
     log.info("")
     log.info("=" * 64)
+
     log.info(f"  ✅  Succeeded : {len(ok)}")
     if ok:
         for n in ok:
@@ -360,6 +367,9 @@ def main():
         for n in failed:
             log.warning(f"       • {n}")
     log.info("=" * 64)
+
+    if failed:
+        raise SystemExit(1)
 
 
 if __name__ == "__main__":

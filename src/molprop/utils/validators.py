@@ -48,7 +48,7 @@ def validate_smiles(smiles: str, allow_empty: bool = False) -> str:
         canonical = Chem.MolToSmiles(mol)
         return canonical
     except Exception as e:
-        raise InvalidSMILESError(smiles, f"Failed to canonicalize: {str(e)}")
+        raise InvalidSMILESError(smiles, f"Failed to canonicalize: {str(e)}") from e
 
 
 def validate_smiles_list(smiles_list: list[str], min_length: int = 1, max_length: int = 1000) -> list[str]:
@@ -84,7 +84,7 @@ def validate_smiles_list(smiles_list: list[str], min_length: int = 1, max_length
         try:
             validated.append(validate_smiles(smiles))
         except InvalidSMILESError as e:
-            raise ValidationError(f"Invalid SMILES at index {i}: {e.message}", field=f"smiles_list[{i}]")
+            raise ValidationError(f"Invalid SMILES at index {i}: {e.message}", field=f"smiles_list[{i}]") from e
 
     return validated
 

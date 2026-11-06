@@ -108,7 +108,6 @@ class ThreadPoolBatchProcessor(Generic[T, P]):
             List of processed results in order.
         """
         results: list[Optional[P]] = [None] * len(items)
-        item_to_index = {id(item): i for i, item in enumerate(items)}
 
         with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
             futures = {

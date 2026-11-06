@@ -85,6 +85,10 @@ ignore = [
     "S101", # allow assert for pytest
 ]
 
+[tool.ruff.lint.per-file-ignores]
+# These literals are synthetic inputs for password hashing and log-redaction tests.
+"tests/test_security.py" = ["S105"]
+
 [tool.black]
 line-length = 120
 target-version = ["py311", "py312"]

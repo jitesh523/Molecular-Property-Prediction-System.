@@ -20,14 +20,14 @@ log = logging.getLogger(__name__)
 
 def timing(func: F) -> F:
     """Decorator to log execution time of a function.
-    
+
     Measures wall-clock time from function start to completion (including exceptions)
     and logs elapsed time at debug level. Useful for profiling performance-critical
     code paths.
 
     Args:
         func: Function to wrap
-        
+
     Returns:
         Wrapped function with timing logged
 
@@ -57,11 +57,11 @@ def retry(
     exceptions: tuple[type[Exception], ...] = (Exception,),
 ) -> Callable[[F], F]:
     """Decorator to retry a function on failure with exponential backoff.
-    
+
     Retries the decorated function up to max_attempts times if it raises an
     exception matching the specified exception types. Between retries, waits
     for delay_seconds * (backoff_factor ^ retry_count) seconds.
-    
+
     All exceptions are caught and re-raised after final attempt; the last
     exception encountered is the one raised.
 
@@ -70,7 +70,7 @@ def retry(
         delay_seconds: Initial delay between retries in seconds (default 1.0).
         backoff_factor: Multiplier for delay after each retry (default 2.0).
         exceptions: Tuple of exception types to catch and retry on (default Exception).
-        
+
     Returns:
         Decorator function
 
@@ -117,7 +117,7 @@ def handle_errors(
     log_traceback: bool = True,
 ) -> Callable[[F], F]:
     """Decorator to catch and log exceptions, returning a default value.
-    
+
     Wraps function execution with a try/except that catches both MolpropError
     and generic exceptions, logging them appropriately before returning a
     default value. Useful for functions that should fail gracefully.
@@ -125,7 +125,7 @@ def handle_errors(
     Args:
         default_return: Value to return if any exception occurs.
         log_traceback: Whether to include full traceback in log output (default True).
-        
+
     Returns:
         Decorator function
 
@@ -154,11 +154,11 @@ def handle_errors(
 
 def validate_input(**validators: Callable[[Any], Any]) -> Callable[[F], F]:
     """Decorator to validate function keyword arguments before execution.
-    
+
     Applies validator functions to specified keyword arguments, raising an
     exception if any validator fails. Useful for enforcing constraints on
     function inputs (e.g., SMILES format, numeric bounds).
-    
+
     Note: Currently only validates keyword arguments; positional arguments
     are not validated.
 
@@ -166,7 +166,7 @@ def validate_input(**validators: Callable[[Any], Any]) -> Callable[[F], F]:
         **validators: Mapping of argument name to validator function.
                      Validator should accept one argument and return validated value
                      or raise an exception.
-        
+
     Returns:
         Decorator function
 

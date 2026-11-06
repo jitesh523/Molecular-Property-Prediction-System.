@@ -204,7 +204,7 @@ class TestLibraryAPI:
         # list
         r = client.get("/library", params={"project": "_pytest"})
         assert r.status_code == 200
-        assert any(c["id"] == compound_id for c in r.json())
+        assert any(c["id"] == compound_id for c in r.json()["compounds"])
 
         # get
         r = client.get(f"/library/{compound_id}")
@@ -230,6 +230,23 @@ class TestLibraryAPI:
         text = r.text
         assert text.startswith("id,smiles,name,project,tags")
 
+    def test_csv_export_reads_more_than_one_storage_page(self, client, monkeypatch):
+        import csv
+        import io
+        from unittest.mock import Mock
+
+        from molprop.serving.api import library
+
+        page = [{"id": i, "smiles": "CCO"} for i in range(10000)]
+        query = Mock(side_effect=[page, [{"id": 10000, "smiles": "CCN"}]])
+        monkeypatch.setattr(library, "list", query)
+        response = client.get("/library/export/csv", params={"project": "many"})
+        assert response.status_code == 200
+        rows = list(csv.DictReader(io.StringIO(response.text)))
+        assert len(rows) == 10001
+        assert rows[-1]["smiles"] == "CCN"
+        assert [call.kwargs["offset"] for call in query.call_args_list] == [0, 10000]
+
     def test_csv_import_bulk(self, client):
         r = client.post(
             "/library/import",
@@ -247,7 +264,7 @@ class TestLibraryAPI:
 
         # cleanup
         listed = client.get("/library", params={"project": "_import_test"}).json()
-        for c in listed:
+        for c in listed["compounds"]:
             client.delete(f"/library/{c['id']}")
 
 

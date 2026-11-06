@@ -9,7 +9,7 @@ import pytest
 import torch
 from torch_geometric.data import Batch, Data
 
-from molprop.features.graphs import smiles_to_graph
+from molprop.features.graphs import ATOM_FEATURE_DIM, smiles_to_graph
 from molprop.models.gnn_gat import GATModel
 from molprop.models.gnn_gcn import GCNModel
 from molprop.models.gnn_gin import GINModel
@@ -18,7 +18,7 @@ from molprop.models.gnn_mpnn import MPNNModel
 BENZENE = "c1ccccc1"
 ASPIRIN = "CC(=O)OC1=CC=CC=C1C(=O)O"
 
-IN_DIM = 9
+IN_DIM = ATOM_FEATURE_DIM
 HIDDEN_DIM = 32
 OUT_DIM = 1
 EDGE_DIM = 3

@@ -62,6 +62,7 @@ jobs:
 
   test:
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     strategy:
       fail-fast: false
       matrix:
@@ -79,12 +80,12 @@ jobs:
         run: |
           python -m pip install --upgrade pip setuptools wheel
           # Use specific torch cpu index for stability in headless runner
-          pip install torch==2.2.1 --extra-index-url https://download.pytorch.org/whl/cpu
+          pip install torch==2.2.1 --index-url https://download.pytorch.org/whl/cpu
           pip install torch-geometric==2.5.2 rdkit==2023.9.5 numpy==1.26.4 pandas==2.2.1
           pip install scikit-learn==1.4.1.post1 xgboost==2.0.3 shap pydantic==2.6.3
           pip install fastapi uvicorn httpx matplotlib seaborn rich
           pip install -e .
-          pip install pytest pytest-cov pytest-asyncio pytest-xdist
+          pip install pytest pytest-cov pytest-asyncio pytest-xdist pytest-timeout
 
       - name: Test with pytest + coverage
         run: |
@@ -95,7 +96,7 @@ jobs:
             --cov-report=html \
             -v \
             --tb=short \
-            -n auto 2>/dev/null || pytest tests/ --cov=molprop --cov-report=term-missing --cov-report=xml -v
+            -n 2 --dist=loadfile --timeout=120
 
       - name: Upload coverage to Codecov
         if: matrix.python-version == '3.11'

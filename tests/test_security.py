@@ -135,7 +135,7 @@ class TestAPIKeyGeneration:
     def test_generate_api_key_length(self):
         """Generated key should have specified length."""
         key = generate_api_key(length=16)
-        parts = key.split("_")
+        parts = key.split("_", 1)
         assert len(parts) == 2
 
     def test_validate_api_key_valid(self):
@@ -146,7 +146,8 @@ class TestAPIKeyGeneration:
     def test_validate_api_key_invalid(self):
         """Should reject invalid API key format."""
         assert validate_api_key("invalid_key_format!") is False
-        assert validate_api_key("no_underscore") is False
+        assert validate_api_key("nounderscore") is False
+        assert validate_api_key("sk_test\n") is False
 
 
 class TestConstantTimeCompare:

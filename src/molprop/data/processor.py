@@ -30,17 +30,17 @@ class DatasetProcessor:
         force: bool = False,
     ) -> Optional[pd.DataFrame]:
         """Processes a single dataset: Load -> Standardize -> Drop Invalid -> Save.
-        
+
         Args:
             name: Dataset name (alphanumeric + underscore/hyphen only). Used to find
                   raw data in {raw_dir}/{name}/full.csv and save to {processed_dir}/{name}/processed.csv
             smiles_col: Column name in raw CSV containing SMILES strings (default 'smiles')
             keep_chirality: Preserve stereochemistry information in standardized SMILES
             force: If True, reprocess even if processed.csv already exists
-            
+
         Returns:
             Processed DataFrame on success, None if inputs invalid or processing fails
-            
+
         Raises:
             ValueError: If dataset name contains invalid characters (path traversal protection)
         """
@@ -50,7 +50,7 @@ class DatasetProcessor:
                 f"Invalid dataset name '{name}'. "
                 "Must contain only alphanumeric characters, underscores, and hyphens."
             )
-        
+
         raw_path = self.raw_dir / name / "full.csv"
         out_dir = self.processed_dir / name
         out_path = out_dir / "processed.csv"

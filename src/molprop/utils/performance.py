@@ -12,7 +12,7 @@ import logging
 import time
 from collections import defaultdict
 from contextlib import contextmanager
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any, Callable, Generator, Optional, TypeVar
 
 F = TypeVar("F", bound=Callable[..., Any])
@@ -172,9 +172,9 @@ def measure_time(
 
 
 def profile(
-    func: F,
+    func: Optional[F] = None,
     collect_metrics: bool = True,
-) -> F:
+) -> F | Callable[[F], F]:
     """
     Decorator to profile function execution time.
 
@@ -184,12 +184,15 @@ def profile(
             ...
     """
 
-    @functools.wraps(func)
-    def wrapper(*args: Any, **kwargs: Any) -> Any:
-        with measure_time(f"{func.__module__}.{func.__name__}", record_metrics=collect_metrics):
-            return func(*args, **kwargs)
+    def decorator(wrapped: F) -> F:
+        @functools.wraps(wrapped)
+        def wrapper(*args: Any, **kwargs: Any) -> Any:
+            with measure_time(f"{wrapped.__module__}.{wrapped.__name__}", record_metrics=collect_metrics):
+                return wrapped(*args, **kwargs)
 
-    return wrapper  # type: ignore
+        return wrapper  # type: ignore[return-value]
+
+    return decorator(func) if func is not None else decorator
 
 
 def performance_threshold(threshold_ms: float = 1000.0) -> Callable[[F], F]:

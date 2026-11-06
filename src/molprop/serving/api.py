@@ -109,7 +109,7 @@ async def lifespan(app: FastAPI):
 
                 points = []
                 for row in df.itertuples(index=True):
-                    smiles = getattr(row, "std_smiles")
+                    smiles = row.std_smiles
                     target = getattr(row, resolved_col, None)
                     g = smiles_to_graph(smiles)
                     if g:
@@ -208,7 +208,7 @@ _metrics: dict[str, dict] = {
 @app.middleware("http")
 async def add_timing_header(request: Request, call_next):
     """Add X-Process-Time header and record in-process metrics.
-    
+
     Tracks request latency and error rates per endpoint for production monitoring.
     Logs exceptions with endpoint context for easier debugging and troubleshooting.
     """
@@ -256,7 +256,7 @@ class BatchPredictRequest(BaseModel):
     uncertainty_samples: int = Field(
         0, ge=0, le=50, description="Number of MC Dropout samples for uncertainty estimation"
     )
-    
+
     @field_validator('smiles_list', mode='before')
     @classmethod
     def validate_smiles_list(cls, v):
@@ -267,7 +267,7 @@ class BatchPredictRequest(BaseModel):
             raise ValueError('smiles_list cannot be empty')
         if len(v) > MAX_BATCH_SIZE:
             raise ValueError(f'smiles_list exceeds maximum size ({MAX_BATCH_SIZE})')
-        
+
         for i, smiles in enumerate(v):
             if not isinstance(smiles, str):
                 raise ValueError(f'smiles_list[{i}] must be a string, got {type(smiles).__name__}')
@@ -1513,7 +1513,9 @@ async def compare_compounds(req: CompareRequest):
     fp_a = smiles_to_maccs(a_std)
     fp_b = smiles_to_maccs(b_std)
     similarity = (
-        round(tanimoto_similarity(fp_a, fp_b), 4) if fp_a is not None and fp_b is not None else None
+        round(float((fp_a & fp_b).sum() / (fp_a | fp_b).sum()), 4)
+        if fp_a is not None and fp_b is not None and (fp_a | fp_b).any()
+        else None
     )
 
     scaf_a = analyze_scaffold(a_std)
@@ -1676,9 +1678,8 @@ async def similarity_matrix(req: SimilarityMatrixRequest):
     use the dedicated vector-DB for larger libraries.
     """
     import numpy as np
-    from rdkit import Chem
+    from rdkit import Chem, DataStructs
     from rdkit.Chem import AllChem, MACCSkeys
-    from rdkit import DataStructs
 
     fps: list = []
     canonical: list[str] = []
@@ -2036,7 +2037,13 @@ async def library_export_csv(project: Optional[str] = None):
 
     from fastapi.responses import Response
 
-    rows = library.list(project=project, limit=100000)
+    # Respect the storage query limit while exporting every page.
+    rows = []
+    while True:
+        page = library.list(project=project, limit=10000, offset=len(rows))
+        rows.extend(page)
+        if len(page) < 10000:
+            break
     buf = io.StringIO()
     writer = csv.writer(buf)
     writer.writerow(
@@ -2586,7 +2593,7 @@ async def check_druglikeness(smiles: str):
 # ── Molecule Comparison Endpoint ──────────────────────────────────────────────
 
 
-class CompareRequest(BaseModel):
+class ProfileCompareRequest(BaseModel):
     smiles_a: str = Field(..., max_length=MAX_SMILES_LEN, description="First SMILES string")
     smiles_b: str = Field(..., max_length=MAX_SMILES_LEN, description="Second SMILES string")
 
@@ -2625,8 +2632,8 @@ def _build_profile(smiles: str) -> MoleculeProfile:
     )
 
 
-@app.post("/compare", response_model=CompareResponse, tags=["Cheminformatics"])
-async def compare_molecules(req: CompareRequest):
+@app.post("/compare/profiles", response_model=CompareResponse, tags=["Cheminformatics"])
+async def compare_molecules(req: ProfileCompareRequest):
     """
     Compare two molecules side-by-side.
 

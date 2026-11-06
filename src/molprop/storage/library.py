@@ -32,7 +32,7 @@ class CompoundLibrary:
     """
     Thin sqlite3 wrapper offering CRUD operations on a compound table.
 
-    Thread-safe via a process-level RLock; suitable for FastAPI single-worker
+    Thread-safe via a process-level lock; suitable for FastAPI single-worker
     deployments or low-concurrency multi-worker setups.
     """
 
@@ -121,12 +121,12 @@ class CompoundLibrary:
                     properties_json = excluded.properties_json,
                     notes           = COALESCE(excluded.notes, compounds.notes),
                     updated_at      = excluded.updated_at
-                RETURNING id;
+                RETURNING *;
                 """,
                 (smiles, name, project, tags_json, props_json, notes, ts, ts),
             )
             row = cur.fetchone()
-            return self.get(row["id"])
+            return self._row_to_dict(row)
 
     def get(self, compound_id: int) -> dict[str, Any] | None:
         with DB_LOCK, self._connect() as conn:

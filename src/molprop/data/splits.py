@@ -38,7 +38,7 @@ def scaffold_split(
     groups are shuffled with ``seed`` for reproducibility.
     """
     np.testing.assert_almost_equal(frac_train + frac_val + frac_test, 1.0)
-    rng = random.Random(seed)
+    rng = random.Random(seed)  # noqa: S311 -- Reproducible dataset splitting, not cryptography.
 
     # 1. Map each molecule index to its scaffold
     scaffolds = defaultdict(list)

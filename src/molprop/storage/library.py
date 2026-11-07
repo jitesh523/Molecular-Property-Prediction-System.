@@ -32,7 +32,7 @@ class CompoundLibrary:
     """
     Thin sqlite3 wrapper offering CRUD operations on a compound table.
 
-    Thread-safe via a process-level RLock; suitable for FastAPI single-worker
+    Thread-safe via a process-level lock; suitable for FastAPI single-worker
     deployments or low-concurrency multi-worker setups.
     """
 
@@ -81,7 +81,7 @@ class CompoundLibrary:
         notes: str | None = None,
     ) -> dict[str, Any]:
         """Insert or update a compound (idempotent on (smiles, project)).
-        
+
         Args:
             smiles: SMILES string. Must be non-empty.
             name: Optional compound name.
@@ -89,10 +89,10 @@ class CompoundLibrary:
             tags: Optional list of string tags.
             properties: Optional dict of properties to store as JSON.
             notes: Optional notes/description.
-            
+
         Returns:
             Dictionary with full compound record (id, smiles, name, etc).
-            
+
         Raises:
             ValueError: If smiles/project is empty or project contains invalid characters.
         """
@@ -106,7 +106,7 @@ class CompoundLibrary:
                 f"Invalid project name '{project}'. "
                 f"Must contain only alphanumeric, underscore, hyphen, or dot characters."
             )
-        
+
         ts = _now()
         tags_json = json.dumps(tags or [])
         props_json = json.dumps(properties or {})
@@ -121,12 +121,12 @@ class CompoundLibrary:
                     properties_json = excluded.properties_json,
                     notes           = COALESCE(excluded.notes, compounds.notes),
                     updated_at      = excluded.updated_at
-                RETURNING id;
+                RETURNING *;
                 """,
                 (smiles, name, project, tags_json, props_json, notes, ts, ts),
             )
             row = cur.fetchone()
-            return self.get(row["id"])
+            return self._row_to_dict(row)
 
     def get(self, compound_id: int) -> dict[str, Any] | None:
         with DB_LOCK, self._connect() as conn:
@@ -142,17 +142,17 @@ class CompoundLibrary:
         offset: int = 0,
     ) -> list[dict[str, Any]]:
         """List compounds with optional filtering.
-        
+
         Args:
             project: Filter by project name.
             tag: Filter by tag (post-query; use with caution on large libraries).
             search: Full-text search across SMILES, name, notes.
             limit: Maximum results to return. Must be > 0 and <= 10000.
             offset: Result offset. Must be >= 0.
-            
+
         Returns:
             List of matching compound dictionaries.
-            
+
         Raises:
             ValueError: If limit or offset are out of valid ranges.
         """
@@ -163,7 +163,7 @@ class CompoundLibrary:
             raise ValueError(f"limit exceeds maximum (10000), got {limit}")
         if offset < 0:
             raise ValueError(f"offset must be >= 0, got {offset}")
-        
+
         clauses = []
         params: list[Any] = []
         if project:
@@ -227,7 +227,7 @@ class CompoundLibrary:
 
     def all_tags(self) -> list[str]:
         """Get all unique tags across all compounds.
-        
+
         Returns:
             Sorted list of unique tag strings.
         """

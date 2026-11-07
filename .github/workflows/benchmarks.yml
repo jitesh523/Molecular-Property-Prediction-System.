@@ -15,6 +15,9 @@ on:
 jobs:
   benchmark:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      PIP_CONSTRAINT: ${{ github.workspace }}/constraints-ci.txt
     steps:
       - uses: actions/checkout@v4
 
@@ -28,7 +31,7 @@ jobs:
         run: |
           pip install --upgrade pip
           # Use specific torch cpu index for stability in headless runner
-          pip install torch==2.2.1 --extra-index-url https://download.pytorch.org/whl/cpu
+          pip install torch==2.2.1 --index-url https://download.pytorch.org/whl/cpu
           pip install torch-geometric==2.5.2 rdkit==2023.9.5 numpy==1.26.4 pandas==2.2.1
           pip install scikit-learn==1.4.1.post1 xgboost==2.0.3 matplotlib seaborn rich
           pip install .
@@ -41,7 +44,7 @@ jobs:
           mkdir -p data/processed/bbbp
           # We'll use a 10% subset for the CI benchmark to save time
           python scripts/download_molnet_datasets.py --datasets bbbp
-          python -c "from molprop.data.processor import process_all_benchmark_datasets; from pathlib import Path; process_all_benchmark_datasets(Path('data/raw'), Path('data/processed'))"
+          python -c "from molprop.data.processor import process_all_benchmark_datasets; from pathlib import Path; process_all_benchmark_datasets(Path('data/raw'), Path('data/processed'), datasets=['bbbp'])"
           
           # Run baselines only for CI speed
           python scripts/generate_benchmark.py --datasets bbbp --skip-gnn

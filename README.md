@@ -24,7 +24,7 @@ the `molprop` command-line tool.
 | **Prediction** | `POST /predict`, `POST /predict/batch` |
 | **Generation** | `POST /generate`, `POST /generate/smart` (constrained by MW/LogP/QED/TPSA) |
 | **ADMET** | `POST /admet`, `POST /admet/batch` |
-| **Cheminformatics** | `POST /scaffold`, `POST /scaffold/batch`, `POST /functional_groups`, `POST /isomers`, `POST /substructure`, `POST /compare`, `POST /mcs`, `POST /alerts`, `POST /standardize`, `POST /conformer` |
+| **Cheminformatics** | `POST /scaffold`, `POST /scaffold/batch`, `POST /functional_groups`, `POST /isomers`, `POST /substructure`, `POST /compare` (MACCS comparison), `POST /compare/profiles` (Morgan similarity and molecule profiles), `POST /mcs`, `POST /alerts`, `POST /standardize`, `POST /conformer` |
 | **Similarity** | `POST /search/similar` (Morgan / MACCS Tanimoto) |
 | **Reports** | `POST /report` (one-click Markdown report) |
 | **Library** | `POST /library`, `GET /library`, `GET /library/{id}`, `PATCH /library/{id}`, `DELETE /library/{id}`, `GET /library/projects`, `GET /library/export/csv`, `POST /library/import` |

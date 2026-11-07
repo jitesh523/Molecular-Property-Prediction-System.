@@ -23,7 +23,7 @@ class ModelConfig:
     task: str = field(default_factory=lambda: os.getenv("MODEL_TASK", "classification"))
     target_col: str = field(default_factory=lambda: os.getenv("MODEL_TARGET_COL", ""))
     hidden_dim: int = field(default_factory=lambda: int(os.getenv("MODEL_HIDDEN_DIM", "128")))
-    atom_feature_dim: int = field(default_factory=lambda: int(os.getenv("ATOM_FEATURE_DIM", "39")))
+    atom_feature_dim: int = field(default_factory=lambda: int(os.getenv("ATOM_FEATURE_DIM", "40")))
 
     def __post_init__(self) -> None:
         """Validate model configuration."""
@@ -34,7 +34,7 @@ class ModelConfig:
         valid_tasks = {"classification", "regression", "multitask"}
         if self.task not in valid_tasks:
             raise ValueError(f"Invalid task '{self.task}'. Must be one of {valid_tasks}")
-        
+
         if self.hidden_dim <= 0:
             raise ValueError(f"hidden_dim must be positive, got {self.hidden_dim}")
         if self.atom_feature_dim <= 0:
@@ -45,7 +45,7 @@ class ModelConfig:
 class APIConfig:
     """REST API configuration."""
 
-    host: str = field(default_factory=lambda: os.getenv("API_HOST", "0.0.0.0"))
+    host: str = field(default_factory=lambda: os.getenv("API_HOST", "0.0.0.0"))  # noqa: S104 -- Configurable container bind address.
     port: int = field(default_factory=lambda: int(os.getenv("API_PORT", "8000")))
     workers: int = field(default_factory=lambda: int(os.getenv("API_WORKERS", "1")))
     debug: bool = field(default_factory=lambda: os.getenv("API_DEBUG", "false").lower() == "true")

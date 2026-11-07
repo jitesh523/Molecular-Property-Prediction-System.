@@ -49,7 +49,7 @@ class TestMaxMinCore:
         r = maxmin_select(smiles, n_pick=5)
         # Skip the seed (index 0 sentinel == 1.0). Remaining should be non-increasing.
         dists = r.min_distances[1:]
-        for a, b in zip(dists, dists[1:]):
+        for a, b in zip(dists, dists[1:], strict=False):
             assert b <= a + 1e-9
 
 

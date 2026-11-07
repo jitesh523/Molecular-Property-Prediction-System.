@@ -390,7 +390,7 @@ def test_druglikeness_overall_bool(client):
 def test_compare_valid_pair(client):
     """Two valid SMILES should return profiles and a Tanimoto score."""
     response = client.post(
-        "/compare",
+        "/compare/profiles",
         json={"smiles_a": "c1ccccc1", "smiles_b": "CC(=O)OC1=CC=CC=C1C(=O)O"},
     )
     assert response.status_code == 200
@@ -405,7 +405,7 @@ def test_compare_valid_pair(client):
 def test_compare_identical_molecules(client):
     """Same molecule should yield Tanimoto similarity of 1.0."""
     response = client.post(
-        "/compare",
+        "/compare/profiles",
         json={"smiles_a": "c1ccccc1", "smiles_b": "c1ccccc1"},
     )
     assert response.status_code == 200
@@ -416,7 +416,7 @@ def test_compare_identical_molecules(client):
 def test_compare_descriptors_present(client):
     """Profiles should include 18 physicochemical descriptors."""
     response = client.post(
-        "/compare",
+        "/compare/profiles",
         json={"smiles_a": "c1ccccc1", "smiles_b": "CCO"},
     )
     assert response.status_code == 200
@@ -428,7 +428,7 @@ def test_compare_descriptors_present(client):
 def test_compare_lipinski_present(client):
     """Each profile must expose Lipinski Ro5 results."""
     response = client.post(
-        "/compare",
+        "/compare/profiles",
         json={"smiles_a": "c1ccccc1", "smiles_b": "CCO"},
     )
     assert response.status_code == 200
@@ -443,7 +443,7 @@ def test_compare_lipinski_present(client):
 def test_compare_one_invalid_smiles(client):
     """One invalid SMILES should produce an error profile but not crash."""
     response = client.post(
-        "/compare",
+        "/compare/profiles",
         json={"smiles_a": "NOT_VALID_XYZ", "smiles_b": "c1ccccc1"},
     )
     assert response.status_code == 200

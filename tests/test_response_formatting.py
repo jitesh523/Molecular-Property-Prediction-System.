@@ -1,13 +1,12 @@
 """Tests for response formatting utilities."""
 
-import pytest
 from datetime import datetime
 from decimal import Decimal
 from enum import Enum
 from uuid import UUID
 
+from molprop.exceptions import ValidationError
 from molprop.utils.response import (
-    JSONEncoder,
     batch_response,
     error_response,
     from_json,
@@ -15,7 +14,6 @@ from molprop.utils.response import (
     success_response,
     to_json,
 )
-from molprop.exceptions import ValidationError
 
 
 class TestJSONEncoder:

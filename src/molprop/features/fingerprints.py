@@ -1,8 +1,7 @@
 from typing import List, Optional
 
 import numpy as np
-from rdkit import Chem
-from rdkit import DataStructs
+from rdkit import Chem, DataStructs
 from rdkit.Chem import AllChem, MACCSkeys
 
 

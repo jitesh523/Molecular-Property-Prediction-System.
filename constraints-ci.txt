@@ -1,0 +1,13 @@
+# Match the binary stack tested with RDKit 2023.9.5 on Python 3.11/3.12.
+# Later dependency installations must not silently replace NumPy's 1.x ABI
+# or install CUDA PyTorch over the CPU wheel selected by these workflows.
+numpy==1.26.4
+pandas==2.2.1
+torch==2.2.1
+torch-geometric==2.5.2
+rdkit==2023.9.5
+scikit-learn==1.4.1.post1
+xgboost==2.0.3
+shap==0.46.0
+captum==0.7.0
+umap-learn==0.5.6

@@ -7,6 +7,7 @@ from rich.console import Console
 from rich.table import Table
 
 from molprop.data.splits import random_scaffold_split, scaffold_kfold, scaffold_split
+from molprop.data.targets import target_columns
 from molprop.features.fingerprints import batch_smiles_to_morgan
 from molprop.models.baselines import BaselineModel
 from molprop.models.explain_baselines import (
@@ -40,7 +41,7 @@ def run_benchmark(
     # In processed.csv, std_smiles is the first column.
     # Remaining columns are targets.
     smiles_list = df["std_smiles"].tolist()
-    target_cols = [c for c in df.columns if c != "std_smiles"]
+    target_cols = target_columns(df, dataset_name)
 
     if not target_cols:
         log.error(f"No target columns found in {dataset_name}")
@@ -164,7 +165,7 @@ def run_kfold_benchmark(
     df = pd.read_csv(data_path)
 
     smiles_list = df["std_smiles"].tolist()
-    target_cols = [c for c in df.columns if c != "std_smiles"]
+    target_cols = target_columns(df, dataset_name)
     if not target_cols:
         log.error(f"No target columns found in {dataset_name}")
         return

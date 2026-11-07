@@ -41,10 +41,10 @@ def load_gnn_model(
         dropout: Dropout probability.
         device: Device to load model onto.
         **kwargs: Extra kwargs (e.g., heads for GAT, edge_dim for MPNN).
-        
+
     Returns:
         Initialized GNN model in eval mode on specified device.
-        
+
     Raises:
         FileNotFoundError: If weights_path does not exist.
         ValueError: If weights_path is not a file or model_type is unknown.
@@ -56,7 +56,7 @@ def load_gnn_model(
         raise FileNotFoundError(f"Model weights not found: {weights_path}")
     if not weights_file.is_file():
         raise ValueError(f"weights_path is not a file: {weights_path}")
-    
+
     if model_type == "gcn":
         model = GCNModel(
             in_dim=in_dim,
@@ -105,7 +105,7 @@ def load_gnn_model(
         # nosec: B614 - loading local trusted weights from configured path
         state_dict = torch.load(weights_file, map_location=device, weights_only=True)
         model.load_state_dict(state_dict)
-    except FileNotFoundError as e:
+    except FileNotFoundError:
         log.error(f"Weights file disappeared during load: {weights_path}")
         raise
     except RuntimeError as e:
@@ -121,7 +121,7 @@ def load_gnn_model(
             exc_info=True
         )
         raise
-    
+
     model.to(device)
     model.eval()
     log.info(

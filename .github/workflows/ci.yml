@@ -63,6 +63,8 @@ jobs:
   test:
     runs-on: ubuntu-latest
     timeout-minutes: 25
+    env:
+      PIP_CONSTRAINT: ${{ github.workspace }}/constraints-ci.txt
     strategy:
       fail-fast: false
       matrix:

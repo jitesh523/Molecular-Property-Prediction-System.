@@ -16,6 +16,8 @@ jobs:
   benchmark:
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    env:
+      PIP_CONSTRAINT: ${{ github.workspace }}/constraints-ci.txt
     steps:
       - uses: actions/checkout@v4
 

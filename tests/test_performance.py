@@ -1,6 +1,5 @@
 """Tests for performance monitoring utilities."""
 
-import pytest
 import time
 
 from molprop.utils.performance import (
@@ -157,6 +156,16 @@ class TestMeasureTimeContextManager:
 
 class TestProfileDecorator:
     """Test @profile decorator."""
+
+    def test_bare_profile_preserves_result_and_metadata(self):
+        @profile
+        def multiply(left, right):
+            """Multiply two inputs."""
+            return left * right
+
+        assert multiply(3, 7) == 21
+        assert multiply.__name__ == "multiply"
+        assert multiply.__doc__ == "Multiply two inputs."
 
     def test_profile_decorator_execution(self):
         """Decorated function should execute correctly."""

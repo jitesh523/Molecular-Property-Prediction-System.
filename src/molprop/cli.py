@@ -87,7 +87,7 @@ def cli(ctx: click.Context, url: str, timeout: float, pretty: bool) -> None:
 @_handle_errors
 def health(ctx: click.Context) -> None:
     """Check if the API is running and models are loaded.
-    
+
     Returns the API health status including whether the GNN model and VAE are available.
     """
     _emit(ctx, _client(ctx).health())
@@ -98,7 +98,7 @@ def health(ctx: click.Context) -> None:
 @_handle_errors
 def version(ctx: click.Context) -> None:
     """Show API and dependency versions.
-    
+
     Returns molprop version, API version, PyTorch version, and model/VAE availability.
     """
     _emit(ctx, _client(ctx).version())
@@ -125,10 +125,10 @@ def version(ctx: click.Context) -> None:
 @_handle_errors
 def predict(ctx: click.Context, smiles: str, explain: bool, uncertainty: int) -> None:
     """Predict molecular properties from a SMILES string.
-    
+
     Standardizes input SMILES, generates graph representation, and runs GNN inference.
     Optionally generates explanations and Bayesian uncertainty estimates.
-    
+
     Example:
         molprop predict "CC(=O)Oc1ccccc1C(=O)O" --explain --uncertainty 10
     """
@@ -144,10 +144,10 @@ def predict(ctx: click.Context, smiles: str, explain: bool, uncertainty: int) ->
 @_handle_errors
 def scaffold(ctx: click.Context, smiles: str) -> None:
     """Analyze Bemis–Murcko scaffold and compute SAScore.
-    
+
     Returns the molecular scaffold (side chains removed), ring information,
     and synthetic accessibility score (1=easy, 10=hard).
-    
+
     Example:
         molprop scaffold "CC(=O)NC1=CC=C(O)C=C1"
     """
@@ -183,10 +183,10 @@ def functional_groups(ctx: click.Context, smiles: str) -> None:
 @_handle_errors
 def isomers(ctx: click.Context, smiles: str, max_tautomers: int, max_stereoisomers: int) -> None:
     """Enumerate tautomers and stereoisomers for a molecule.
-    
+
     Returns canonical tautomer, all tautomer variants, and stereoisomer variants.
     Limits prevent combinatorial explosion on heavily substituted molecules.
-    
+
     Example:
         molprop isomers "CCO" --max-tautomers 25 --max-stereoisomers 16
     """
@@ -207,10 +207,10 @@ def isomers(ctx: click.Context, smiles: str, max_tautomers: int, max_stereoisome
 @_handle_errors
 def compare(ctx: click.Context, smiles_a: str, smiles_b: str, metric: str) -> None:
     """Compare two molecules using structural similarity.
-    
+
     Computes MACCS fingerprint similarity between two SMILES strings.
     Supports multiple distance metrics (Tanimoto, Cosine, Euclidean).
-    
+
     Example:
         molprop compare "CCO" "CCN" --metric tanimoto
     """

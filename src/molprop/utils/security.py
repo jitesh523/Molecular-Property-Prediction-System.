@@ -117,7 +117,7 @@ def generate_api_key(prefix: str = "sk", length: int = 32) -> str:
 
     Args:
         prefix: Key prefix.
-        length: Length of random part.
+        length: Number of cryptographically random bytes before URL-safe encoding.
 
     Returns:
         Generated API key.
@@ -137,7 +137,7 @@ def validate_api_key(api_key: str) -> bool:
         True if valid format.
     """
     # Format: prefix_base64urlsafe_characters
-    return bool(re.match(r"^[a-zA-Z0-9_-]+_[a-zA-Z0-9_-]+$", api_key))
+    return bool(re.fullmatch(r"[a-zA-Z0-9_-]+_[a-zA-Z0-9_-]+", api_key))
 
 
 def constant_time_compare(a: str, b: str) -> bool:
@@ -200,6 +200,7 @@ def sanitize_log_data(data: dict) -> dict:
         "password",
         "token",
         "api_key",
+        "apikey",
         "secret",
         "authorization",
         "auth",

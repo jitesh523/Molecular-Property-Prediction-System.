@@ -30,7 +30,7 @@ def smiles_to_descriptors(smiles: str) -> Optional[np.ndarray]:
         rdMolDescriptors.CalcFractionCSP3(mol),
         Descriptors.BertzCT(mol),
         Descriptors.MolMR(mol),
-        rdMolDescriptors.CalcNumStereocenters(mol),
+        rdMolDescriptors.CalcNumAtomStereoCenters(mol),
         Descriptors.NHOHCount(mol),
         Descriptors.NOCount(mol),
         Descriptors.NumValenceElectrons(mol),

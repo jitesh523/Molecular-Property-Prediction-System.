@@ -17,7 +17,7 @@ from molprop.features.fingerprints import (
     smiles_to_morgan,
     tanimoto_similarity,
 )
-from molprop.features.graphs import batch_smiles_to_graphs, smiles_to_graph
+from molprop.features.graphs import ATOM_FEATURE_DIM, batch_smiles_to_graphs, smiles_to_graph
 
 VALID_SMILES = "c1ccccc1"  # benzene
 ASPIRIN = "CC(=O)OC1=CC=CC=C1C(=O)O"
@@ -242,4 +242,4 @@ class TestBatchSmilesToGraphs:
 
     def test_node_feature_dim(self):
         graphs = batch_smiles_to_graphs([VALID_SMILES])
-        assert graphs[0].x.shape[1] == 9
+        assert graphs[0].x.shape[1] == ATOM_FEATURE_DIM

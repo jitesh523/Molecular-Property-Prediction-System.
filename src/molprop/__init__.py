@@ -25,7 +25,17 @@ Quick Start:
 __version__ = "2.45.0"
 
 # Core configuration and logging
-from molprop.config import APIConfig, CacheConfig, Config, DatabaseConfig, ModelConfig, RateLimitConfig, get_config
+# Client and CLI
+from molprop.client import MolpropAPIError, MolpropClient
+from molprop.config import (
+    APIConfig,
+    CacheConfig,
+    Config,
+    DatabaseConfig,
+    ModelConfig,
+    RateLimitConfig,
+    get_config,
+)
 from molprop.exceptions import (
     APIError,
     BadRequestError,
@@ -45,9 +55,6 @@ from molprop.exceptions import (
     get_exception_for_status,
 )
 from molprop.logger import get_logger, setup_logging
-
-# Client and CLI
-from molprop.client import MolpropAPIError, MolpropClient
 
 # Utilities
 from molprop.utils.decorators import handle_errors, retry, timing, validate_input

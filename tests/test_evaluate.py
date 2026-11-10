@@ -63,16 +63,18 @@ class TestComputeMetricsClassification:
 
     def test_custom_threshold_changes_accuracy(self):
         y_true = np.array([0, 0, 1, 1])
-        y_score = np.array([0.4, 0.6, 0.4, 0.6])
+        y_score = np.array([0.1, 0.2, 0.4, 0.6])
         m_low = compute_metrics(y_true, y_score, task="classification", threshold=0.3)
         m_high = compute_metrics(y_true, y_score, task="classification", threshold=0.7)
-        assert m_low["accuracy"] != m_high["accuracy"]
+        assert m_low["accuracy"] == pytest.approx(1.0)
+        assert m_high["accuracy"] == pytest.approx(0.5)
 
     def test_specificity_all_true_negatives(self):
         y_true = np.array([0, 0, 0, 0])
         y_score = np.array([0.1, 0.2, 0.1, 0.15])
         m = compute_metrics(y_true, y_score, task="classification")
         assert m["specificity"] == pytest.approx(1.0)
+        assert np.isnan(m["roc_auc"])
 
     def test_metric_values_are_floats(self):
         y_true = np.array([0, 1, 0, 1])

@@ -30,12 +30,11 @@ from __future__ import annotations
 import functools
 import hashlib
 import json
+import logging
 import time
 from collections import OrderedDict
 from threading import RLock
 from typing import Any, Callable
-
-import logging
 
 try:  # pydantic v2
     from pydantic import BaseModel
@@ -102,16 +101,16 @@ endpoint_cache = _LRUTTLCache(maxsize=1024)
 
 def _stable_key(fn_name: str, args: tuple, kwargs: dict) -> str | None:
     """Build a deterministic cache key for function arguments.
-    
+
     Converts Pydantic models and serializable types to JSON for hashing.
     Returns None if any argument cannot be safely serialized; the call
     then bypasses the cache (graceful degradation).
-    
+
     Args:
         fn_name: Function name for key namespace.
         args: Function arguments to serialize.
         kwargs: Function keyword arguments to serialize.
-        
+
     Returns:
         SHA256 hex digest of serialized arguments, or None if serialization fails.
     """
@@ -141,19 +140,19 @@ def _stable_key(fn_name: str, args: tuple, kwargs: dict) -> str | None:
 
 def cached_json(ttl_seconds: float = 600.0) -> Callable[[Callable], Callable]:
     """Decorate an async endpoint to cache its return value for ``ttl_seconds``.
-    
+
     Caches serializable responses based on request arguments. If arguments cannot
     be serialized or ttl_seconds is invalid, gracefully skips caching.
-    
+
     Args:
         ttl_seconds: Cache time-to-live in seconds. Must be positive (default 600s).
-        
+
     Returns:
         Async decorator function.
-        
+
     Raises:
         ValueError: If ttl_seconds <= 0.
-        
+
     Example:
         @app.post("/scaffold")
         @cached_json(ttl_seconds=600)  # 10-minute cache

@@ -51,7 +51,7 @@ class ScaffoldAnalysis:
 
 def _bemis_murcko(mol: Chem.Mol) -> Optional[Chem.Mol]:
     """Extract Bemis–Murcko scaffold from molecule.
-    
+
     Returns the scaffold with side chains stripped to generic ring system,
     or None if extraction fails.
     """
@@ -64,7 +64,7 @@ def _bemis_murcko(mol: Chem.Mol) -> Optional[Chem.Mol]:
 
 def _generic_murcko(scaffold_mol: Chem.Mol) -> Optional[Chem.Mol]:
     """Convert scaffold to generic form (all atoms to C, bonds to single).
-    
+
     Returns the generic scaffold or None if conversion fails.
     """
     try:

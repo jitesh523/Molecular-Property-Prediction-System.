@@ -1,3 +1,5 @@
+import pytest
+
 from molprop.data.standardize import (
     ghose_filter,
     passes_lipinski_ro5,
@@ -61,7 +63,8 @@ def test_standardize_chirality_dropped():
 def test_standardize_invalid():
     """Test handling of invalid SMILES."""
     assert standardize_smiles("InvalidSmiles123") is None
-    assert standardize_smiles("") is None
+    with pytest.raises(ValueError, match="non-empty string"):
+        standardize_smiles("")
 
 
 # ── Lipinski Rule of Five ──────────────────────────────────────────────────────
@@ -141,10 +144,11 @@ def test_veber_invalid_smiles_returns_none():
 
 def test_veber_custom_limits():
     """Tightening limits should cause a simple molecule to fail."""
-    result = veber_filter("CC(=O)OC1=CC=CC=C1C(=O)O", rot_bonds_limit=2)
+    result = veber_filter("CC(=O)OC1=CC=CC=C1C(=O)O", rot_bonds_limit=1)
     assert result is not None
     assert result["passes"] is False
     assert any("RotatableBonds" in v for v in result["violations"])
+    assert veber_filter("CC(=O)OC1=CC=CC=C1C(=O)O", rot_bonds_limit=2)["passes"] is True
 
 
 # ── Ghose Filter ───────────────────────────────────────────────────────────────
@@ -156,6 +160,7 @@ def test_ghose_aspirin_passes():
     assert result is not None
     assert result["passes"] is True
     assert result["violations"] == []
+    assert result["NumAtoms"] == 21
 
 
 def test_ghose_returns_property_values():

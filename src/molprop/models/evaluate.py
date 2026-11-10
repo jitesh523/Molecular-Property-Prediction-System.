@@ -55,7 +55,10 @@ def compute_metrics(
 
     if task == "classification":
         y_pred = (y_score >= threshold).astype(int)
-        metrics["roc_auc"] = round(float(roc_auc_score(y_true, y_score)), 4)
+        metrics["roc_auc"] = (
+            round(float(roc_auc_score(y_true, y_score)), 4)
+            if np.unique(y_true).size > 1 else float("nan")
+        )
         metrics["avg_precision"] = round(float(average_precision_score(y_true, y_score)), 4)
         metrics["accuracy"] = round(float(accuracy_score(y_true, y_pred)), 4)
         metrics["f1"] = round(float(f1_score(y_true, y_pred, zero_division=0)), 4)

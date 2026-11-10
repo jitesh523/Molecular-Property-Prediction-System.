@@ -23,11 +23,10 @@ from sklearn.metrics import (
     r2_score,
     roc_auc_score,
 )
-from torch_geometric.loader import DataLoader
 
 from molprop.data.splits import random_scaffold_split
+from molprop.data.targets import target_columns
 from molprop.features.fingerprints import batch_smiles_to_morgan
-from molprop.features.graphs import smiles_to_graph
 from molprop.models.baselines import BaselineModel
 from molprop.models.evaluate import (
     plot_calibration_curve,
@@ -85,7 +84,7 @@ def run_baseline_benchmark(
 
     df = pd.read_csv(data_path)
     smiles_list = df["std_smiles"].tolist()
-    target_cols = [c for c in df.columns if c != "std_smiles"]
+    target_cols = target_columns(df, dataset_name)
     if not target_cols:
         return []
     target = target_cols[0]
@@ -145,6 +144,9 @@ def run_gnn_benchmark(
 ) -> List[Dict]:
     """Run GNN models on a dataset (only if trained weights exist)."""
     import torch
+    from torch_geometric.loader import DataLoader
+
+    from molprop.features.graphs import smiles_to_graph
 
     with torch.no_grad():
         data_path = processed_dir / dataset_name / "processed.csv"
@@ -152,7 +154,7 @@ def run_gnn_benchmark(
             return []
 
         df = pd.read_csv(data_path)
-        target_cols = [c for c in df.columns if c != "std_smiles"]
+        target_cols = target_columns(df, dataset_name)
         if not target_cols:
             return []
         target = target_cols[0]
